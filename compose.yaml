@@ -1,0 +1,52 @@
+services:
+  cloud:
+    build: .
+    image: edgeguard:local
+    environment:
+      EDGEGUARD_ROLE: cloud
+      EDGEGUARD_API_KEY: ${EDGEGUARD_API_KEY:?Run python scripts/configure.py first}
+      EDGEGUARD_DB: /app/data/cloud.db
+      EDGEGUARD_ENABLE_FAULTS: ${EDGEGUARD_ENABLE_FAULTS:-0}
+    ports: ["127.0.0.1:8001:8000"]
+    volumes: ["cloud-data:/app/data"]
+    mem_limit: 512m
+    cpus: 1
+    restart: unless-stopped
+  edge:
+    build: .
+    image: edgeguard:local
+    environment:
+      EDGEGUARD_ROLE: edge
+      EDGEGUARD_API_KEY: ${EDGEGUARD_API_KEY:?Run python scripts/configure.py first}
+      EDGEGUARD_CLOUD_URL: http://cloud:8000
+      EDGEGUARD_DB: /app/data/edge.db
+    ports: ["127.0.0.1:8000:8000"]
+    volumes: ["edge-data:/app/data"]
+    mem_limit: 512m
+    cpus: 1
+    restart: unless-stopped
+  broker:
+    image: eclipse-mosquitto:2
+    profiles: [mqtt]
+    ports: ["127.0.0.1:1883:1883"]
+    volumes:
+      - ./deploy/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - broker-data:/mosquitto/data
+    mem_limit: 128m
+    restart: unless-stopped
+  mqtt-bridge:
+    image: edgeguard:local
+    build: .
+    profiles: [mqtt]
+    command: ["python", "-m", "scripts.mqtt_bridge"]
+    environment:
+      EDGEGUARD_API_KEY: ${EDGEGUARD_API_KEY}
+      EDGEGUARD_EDGE_URL: http://edge:8000
+      MQTT_HOST: broker
+    depends_on: [edge, broker]
+    mem_limit: 128m
+    restart: unless-stopped
+volumes:
+  edge-data:
+  cloud-data:
+  broker-data:
