@@ -19,6 +19,8 @@ services:
       EDGEGUARD_ROLE: edge
       EDGEGUARD_API_KEY: ${EDGEGUARD_API_KEY:?Run python scripts/configure.py first}
       EDGEGUARD_CLOUD_URL: http://cloud:8000
+      EDGEGUARD_ENABLE_FAULTS: ${EDGEGUARD_ENABLE_FAULTS:-0}
+      EDGEGUARD_UPLOAD_BPS: ${EDGEGUARD_UPLOAD_BPS:-32768}
       EDGEGUARD_DB: /app/data/edge.db
     ports: ["127.0.0.1:8000:8000"]
     volumes: ["edge-data:/app/data"]

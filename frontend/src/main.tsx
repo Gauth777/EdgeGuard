@@ -28,6 +28,7 @@ import {
 } from "recharts";
 import "./style.css";
 import DataFlow from "./DataFlow";
+import CommandCenter, { ScenarioLab } from "./CommandCenter";
 
 type ModelSignal = {
   sensor: string;
@@ -35,7 +36,8 @@ type ModelSignal = {
   normal_low: number;
   normal_high: number;
 };
-type Reading = {
+export type Reading = {
+  filtered?: Record<string, number>;
   timestamp: number;
   values: Record<string, number | null>;
   quality: Record<string, string>;
@@ -89,7 +91,7 @@ type Incident = {
   pre_seconds: number;
   model: string;
 };
-type State = {
+export type State = {
   role: string;
   machines: Machine[];
   incidents: Incident[];
@@ -332,7 +334,8 @@ function App() {
             ["Incidents", AlertTriangle],
             ["Data Flow", Database],
             ["Delivery", Cloud],
-          ].map(([name, Icon]) => (
+            ["Scenario Lab", SlidersHorizontal],
+          ].filter(([name]) => local || name !== "Scenario Lab").map(([name, Icon]) => (
             <button
               key={String(name)}
               className={tab === name ? "active" : ""}
@@ -402,12 +405,12 @@ function App() {
               </div>
               <h1>
                 {tab === "Overview"
-                  ? "Operations overview"
+                  ? "Operations command"
                   : tab === "Machine"
                     ? "Machine intelligence"
                     : tab === "Incidents"
                       ? "Incident workspace"
-                      : tab === "Data Flow" ? "Readings & data flow" : "Delivery & recovery"}
+                      : tab === "Data Flow" ? "Readings & data flow" : tab === "Scenario Lab" ? "Scenario Lab" : "Delivery & recovery"}
               </h1>
               <p>
                 {tab === "Overview"
@@ -416,7 +419,7 @@ function App() {
                     ? "Inspect the measurements behind every decision."
                     : tab === "Incidents"
                       ? "Follow the evidence from detection through recovery."
-                      : tab === "Data Flow" ? "Inspect saved readings, selection decisions and real delivery receipts." : "Know what is waiting, what was retried and what reached the cloud."}
+                      : tab === "Data Flow" ? "Inspect saved readings, selection decisions and real delivery receipts." : tab === "Scenario Lab" ? "Exercise the complete system with controlled inputs and real failures." : "Know what is waiting, what was retried and what reached the cloud."}
               </p>
             </div>
             {local && tab === "Overview" && (
@@ -481,7 +484,9 @@ function App() {
               </button>
             </form>
           )}
-          {tab === "Overview" && (
+          {tab === "Scenario Lab" && <ScenarioLab accessKey={key} state={state} navigate={setTab} select={setSelected}/>}
+          {tab === "Overview" && local && <CommandCenter accessKey={key} state={state} history={history} selected={selected} select={setSelected} navigate={setTab} incident={id => {setIncidentId(id); setTab("Incidents");}}/>}
+          {tab === "Overview" && !local && (
             <>
               <div className="metrics">
                 <Metric

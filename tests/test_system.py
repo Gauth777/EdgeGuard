@@ -216,6 +216,8 @@ def test_worker_against_cloud_loss_of_ack(store, tmp_path, monkeypatch):
             assert store.snapshot()["pending"] > 0
             with store.tx() as c:
                 c.execute("UPDATE outbox SET due=0")
+            # Advance both retry and upload-pacing gates for this recovery check.
+            worker.next_send_at = 0
             await worker.once(client)
             assert worker.status in ("CONNECTED", "SYNCING")
 

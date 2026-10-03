@@ -18,3 +18,11 @@ A Starlette TestClient deprecation warning is emitted by the pinned dependency s
 - TypeScript and production build pass.
 - The trained binary remains local/ignored; scripts.setup_ml generates and enables it explicitly.
 - Live browser verification: below-threshold telemetry generated a model-only incident (no rule trigger); synthetic origin, model version and signal evidence displayed correctly. No JavaScript page errors detected.
+
+## Operations console update — 2026-10-03
+
+- 32 backend tests passed, including authenticated/disabled lab controls, scenario start/stop and duplicate-start rejection, upload pacing, first-attempt versus retry byte accounting, deduplicated offline counters, persisted connection journal, and critical detection with a missing sensor.
+- Existing outage/restart, lost-acknowledgement, data-flow, queue pressure and ML tests pass. The lost-ack test advances both retry and pacing gates before retrying.
+- TypeScript and Vite production build pass. Bundle-size advisory remains (~653 kB minified JS).
+- Browser visual verification of this redesign was blocked: the cloud browser refused the local preview URL with ERR_BLOCKED_BY_CLIENT. No new claim of desktop/mobile visual QA is made.
+- Docker enforcement, Windows runtime measurements, MQTT and representative hundreds-of-machine capacity have not been newly verified. Process resource metrics are instrumentation, not benchmark results.

@@ -35,3 +35,26 @@ The default launcher binds only loopback. All state reads and writes require a c
 ## Resource boundary
 
 Counts are bounded on edge storage and responses list only 200 recent incidents / 100 queue items. Detailed incident evidence can make polling expensive at high incident volumes; a paginated detail API is a future improvement. Cloud receipt retention needs an administrative policy. CPU/memory limits in Compose must be validated on the intended edge hardware. Event backoff caps at 30 seconds without jitter; multiple edge nodes would need jitter and node-scoped IDs.
+
+## Operations console and observable requirements
+
+The local overview is now an operations console: receive → validate → decide → preserve → synchronise. Each stage links to its underlying records. Cloud views continue reading only their own database.
+
+| Requirement | Implementation | Visible evidence |
+|---|---|---|
+| Noisy/incomplete input | Per-sensor validation; causal median for complete ML inputs; raw rules bypass smoothing | Raw/filtered chart, gaps, quality flags |
+| Abnormal behaviour | Immediate critical rules; three-reading warning persistence; optional machine-bound Isolation Forest | Incident reasons, model origin/version, source measurements |
+| Urgency | P3 critical, P2 warnings/operator updates, P1 evidence, P0 routine summaries | Queue counts and bytes per priority |
+| Transmission reduction | Fifteen-second valid-value summaries with latest snapshot | Baseline versus actual payload bytes; retry bytes separately |
+| Offline detection | Ingestion and detection require no cloud response | Offline hero, session counters for accepted/critical readings during observed outage |
+| Local buffering | Transactional incident/outbox SQLite writes, bounded queue, routine eviction first | Pending records, age, bytes, explicit dropped events/backpressure |
+| Synchronisation | Stable IDs, acknowledgements, retries, version checks | Persisted event ledger and connection-transition journal |
+| Resource limits | Upload pacing, bounded histories/queues; CPU/RSS/latency sampling; Compose CPU/RAM caps | Measured CPU, RAM, processing p95 and configured payload budget |
+
+Runtime CPU is process CPU relative to one core and can exceed 100% on multithreaded native runs. Memory budget is an indicator on native Python; only Compose configures OS limits. Upload pacing spaces send starts by payload bytes/budget, permits one event burst, and includes retry traffic. It is not link-level traffic shaping: HTTP/TLS overhead is excluded. A large evidence burst can delay a later notification until the current pacing debt clears. Counters for offline readings reset on process restart; the connection journal and transport records persist. An outage is observed after a failed cloud request, so those counters do not establish the exact physical disconnection time.
+
+Scenario Lab is authenticated and enabled only by EDGEGUARD_ENABLE_FAULTS=1. It produces explicitly synthetic inputs using the same domain ingestion path and never uses a real-equipment-calibrated model. Cloud controls forward to the cloud's fault endpoint; real ingestion failures, SQLite persistence and retry semantics remain active. Fault controls are for exercising this pilot, not industrial control. A stopped publisher eventually produces a stale stream.
+
+### Remaining validation
+
+Hardware calibration, representative fleet load, long outage storage limits, Windows resource sampling and Compose/MQTT runtime need validation on the target installation. No interface badge constitutes a certification or a passing test. ML robustness limitations remain documented in ml-report.md.

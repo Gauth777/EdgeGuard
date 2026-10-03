@@ -16,6 +16,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field
 
 from .core import CapacityError, Store
+from .runtime import RuntimeMonitor, ScenarioLab
 
 log = logging.getLogger("edgeguard")
 
@@ -54,15 +55,53 @@ class Fault(BaseModel):
     mode: Literal["online", "offline", "lose_ack"]
 
 
+class LabRequest(BaseModel):
+    scenario: Literal[
+        "normal",
+        "noisy_normal",
+        "missing",
+        "critical",
+        "subthreshold",
+        "combination",
+        "healthy_shift",
+    ]
+    seconds: int = Field(default=120, ge=90, le=600)
+
+
+class BandwidthBudget(BaseModel):
+    bytes_per_second: int = Field(ge=1024, le=1048576)
+
+
 class SyncWorker:
     def __init__(self, store, url, key):
         self.store, self.url, self.key = store, url, key
         self.status = "STARTING"
         self.last_success = None
         self.last_error = None
+        self.bytes_per_second = max(
+            1024, int(os.getenv("EDGEGUARD_UPLOAD_BPS", "32768"))
+        )
+        self.next_send_at = 0.0
+        self.paced = False
+        self.network = "STARTING"
+
+    def network_change(self, value):
+        if hasattr(self, "monitor"):
+            self.monitor.cloud_offline = value == "OFFLINE"
+        if self.network != value:
+            self.store.log_operation(
+                "CLOUD_" + value,
+                "Cloud link restored; pending events can synchronise."
+                if value == "ONLINE"
+                else "Cloud requests failed; detection and buffering remain local.",
+            )
+            self.network = value
 
     async def once(self, client):
         item = await asyncio.to_thread(self.store.pending)
+        self.paced = bool(item and time.monotonic() < self.next_send_at)
+        if self.paced:
+            return
         try:
             if not item:
                 response = await client.get(self.url + "/health")
@@ -70,10 +109,19 @@ class SyncWorker:
                 self.status = "CONNECTED"
                 self.last_success = time.time()
                 self.last_error = None
+                self.network_change("ONLINE")
                 return
+            self.next_send_at = (
+                time.monotonic() + len(item["body"].encode()) / self.bytes_per_second
+            )
             with self.store.tx() as c:
                 self.store.count(
                     c, "attempted_payload_bytes", len(item["body"].encode())
+                )
+                self.store.count(
+                    c,
+                    "retry_payload_bytes" if item["attempts"] else "first_attempt_payload_bytes",
+                    len(item["body"].encode()),
                 )
             response = await client.post(
                 self.url + "/api/events",
@@ -89,9 +137,11 @@ class SyncWorker:
             self.status = "SYNCING" if self.store.snapshot()["pending"] else "CONNECTED"
             self.last_success = time.time()
             self.last_error = None
+            self.network_change("ONLINE")
         except (httpx.HTTPError, ValueError) as exc:
             self.status = "OFFLINE"
             self.last_error = str(exc)[:200]
+            self.network_change("OFFLINE")
             if item:
                 await asyncio.to_thread(self.store.failed, item["id"], str(exc))
 
@@ -133,12 +183,16 @@ def create_app(role=None, path=None, key=None, background=True):
 
         detector = Detector(model_path)
     tasks = []
+    monitor = RuntimeMonitor()
+    worker.monitor = monitor
+    lab = ScenarioLab(store, monitor, detector, model_machine)
 
     @asynccontextmanager
     async def lifespan(app):
         if role == "edge" and background:
             tasks.append(asyncio.create_task(worker.run()))
         yield
+        await lab.stop()
         for task in tasks:
             task.cancel()
             with suppress(asyncio.CancelledError):
@@ -150,6 +204,7 @@ def create_app(role=None, path=None, key=None, background=True):
     app.state.store = store
     app.state.worker = worker
     app.state.fault = "online"
+    app.state.lab = lab
 
     async def auth(x_api_key: str = Header(default="")):
         if not secrets.compare_digest(x_api_key, key):
@@ -210,7 +265,72 @@ def create_app(role=None, path=None, key=None, background=True):
     ):
         return store.data_flow(machine, limit, cloud=role == "cloud")
 
+    @app.get("/api/operations", dependencies=[Depends(auth)])
+    def operations():
+        return dict(
+            store.operations(),
+            runtime=monitor.snapshot(),
+            bandwidth=dict(
+                bytes_per_second=worker.bytes_per_second,
+                paced=worker.paced,
+                wait_seconds=max(0, worker.next_send_at - time.monotonic()),
+                burst_bytes=262144,
+            ),
+            lab=dict(lab.state),
+            fault=app.state.fault if role == "cloud" else None,
+        )
+
     if role == "edge":
+
+        def require_lab():
+            if os.getenv("EDGEGUARD_ENABLE_FAULTS") != "1":
+                raise HTTPException(
+                    404,
+                    "Set EDGEGUARD_ENABLE_FAULTS=1 and restart to enable Scenario Lab",
+                )
+
+        @app.post("/api/testing/scenario", dependencies=[Depends(auth)])
+        async def start_scenario(body: LabRequest):
+            require_lab()
+            result = await lab.start(body.scenario, body.seconds)
+            store.log_operation(
+                "SCENARIO_STARTED", "Synthetic scenario: " + body.scenario
+            )
+            return result
+
+        @app.post("/api/testing/stop", dependencies=[Depends(auth)])
+        async def stop_scenario():
+            require_lab()
+            return await lab.stop()
+
+        @app.post("/api/testing/bandwidth", dependencies=[Depends(auth)])
+        def bandwidth(body: BandwidthBudget):
+            require_lab()
+            worker.bytes_per_second = body.bytes_per_second
+            store.log_operation(
+                "BANDWIDTH_CHANGED",
+                f"Upload budget: {body.bytes_per_second} payload bytes/s; effective for subsequent sends.",
+            )
+            return {"bytes_per_second": worker.bytes_per_second}
+
+        @app.post("/api/testing/cloud", dependencies=[Depends(auth)])
+        async def cloud_fault(body: Fault):
+            require_lab()
+            async with httpx.AsyncClient(timeout=3, trust_env=False) as client:
+                try:
+                    response = await client.post(
+                        worker.url + "/api/testing/fault",
+                        json=body.model_dump(),
+                        headers={"X-API-Key": worker.key},
+                    )
+                    response.raise_for_status()
+                except httpx.HTTPError as exc:
+                    raise HTTPException(
+                        502,
+                        "Cloud control request failed. Check cloud availability and enable fault controls on both nodes.",
+                    ) from exc
+            store.log_operation("FAULT_CONTROL", "Requested cloud mode: " + body.mode)
+            return response.json()
 
         @app.post("/api/machines", dependencies=[Depends(auth)], status_code=201)
         def register(machine: Machine):
@@ -218,7 +338,8 @@ def create_app(role=None, path=None, key=None, background=True):
 
         @app.post("/api/readings", dependencies=[Depends(auth)])
         def ingest(reading: Reading):
-            return store.ingest(
+            return monitor.ingest(
+                store,
                 reading.model_dump(),
                 detector if reading.machine_id == model_machine else None,
             )

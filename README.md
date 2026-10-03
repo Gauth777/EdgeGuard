@@ -167,3 +167,22 @@ See [architecture](docs/architecture.md), [requirement coverage](docs/requiremen
 ## Pilot limitations
 
 No hardware validation, regulatory/safety certification, automatic machine actuation, user accounts, per-device credentials, full audit identity, threshold editing, machine deletion, archival UI, adaptive drift handling, TLS termination, or direct PLC drivers. Cloud receipts currently grow until administratively archived. Disk-full/hardware failures remain an operational risk; backup/export and storage monitoring are required. Only a single API worker and edge-owned edits are supported. Browser login uses one shared operator key. Do not expose this configuration directly to the public internet.
+
+### Operations console update
+
+The local **Overview** now shows the complete decision/delivery path, raw versus filtered sensor history, active incident response, upload payload accounting (including separate retry bytes), a priority queue, CPU/RAM/processing measurements, and a persisted failure/recovery journal. Requirement evidence links lead to the relevant workspace.
+
+**Scenario Lab** lets you start/stop a labelled synthetic normal, noisy, missing-sensor, critical, below-threshold or healthy-shift stream; disconnect/reconnect cloud ingestion; lose one acknowledgement; and change the upload payload budget. Enable it with `EDGEGUARD_ENABLE_FAULTS=1` in `.env`, then restart both services. The below-threshold case requires the synthetic model from `scripts.setup_ml`. All other cases work with rules only. Do not run another publisher on the same lab machine concurrently.
+
+Update on Windows after stopping the services:
+
+```powershell
+git pull
+npm ci --prefix frontend
+npm run build --prefix frontend
+.\.venv\Scripts\python.exe -m scripts.run
+```
+
+Keep existing `.env`, databases and model files. No retraining is required for this UI update. Optional `EDGEGUARD_UPLOAD_BPS=32768` controls average upload payload pacing. CPU/RAM are measured on native runs; Compose configures one CPU and 512 MiB per application service. Native memory is not capped by the dashboard's budget indicator.
+
+Try **Scenario Lab → Critical machine event**, wait for the incident, disconnect the cloud, then open **Overview**. Observe local critical readings and queued events, acknowledge in **Incidents**, reconnect, and inspect acknowledged event IDs in **Data Flow**. Retry backoff and low-bandwidth pacing can delay draining; restoration is not an instant-delivery guarantee.

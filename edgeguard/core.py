@@ -62,6 +62,7 @@ class Store:
             CREATE TABLE IF NOT EXISTS receipts(id TEXT PRIMARY KEY, at REAL NOT NULL);
             CREATE TABLE IF NOT EXISTS cloud_state(id TEXT PRIMARY KEY, version INTEGER NOT NULL, kind TEXT NOT NULL, body TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS counters(key TEXT PRIMARY KEY, value REAL NOT NULL);
+            CREATE TABLE IF NOT EXISTS operations_log(id INTEGER PRIMARY KEY, at REAL NOT NULL, kind TEXT NOT NULL, detail TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS event_audit(id TEXT PRIMARY KEY, machine TEXT NOT NULL, kind TEXT NOT NULL, priority INTEGER NOT NULL, status TEXT NOT NULL, attempts INTEGER NOT NULL DEFAULT 0, created REAL NOT NULL, acknowledged REAL, error TEXT, bytes INTEGER NOT NULL, detail TEXT NOT NULL);
             CREATE INDEX IF NOT EXISTS audit_machine ON event_audit(machine,created);
             CREATE TABLE IF NOT EXISTS reading_routes(reading_id TEXT NOT NULL, event_id TEXT NOT NULL, representation TEXT NOT NULL, PRIMARY KEY(reading_id,event_id,representation));
@@ -314,11 +315,13 @@ class Store:
                     model=getattr(detector, "version", None),
                     source_type=getattr(detector, "source_type", None),
                 )
-            if detector and len(valid) == 5:
+            filtered = {}
+            if len(valid) == 5:
                 # Filtering affects ML only; deterministic limits always see fresh raw values.
                 from .preprocessing import filter_values
 
                 filtered = filter_values(valid, ts, previous)
+            if detector and len(valid) == 5:
                 try:
                     ml = detector.evaluate(filtered)
                 except Exception:
@@ -343,6 +346,7 @@ class Store:
             reading = dict(
                 message,
                 quality=quality,
+                filtered=filtered,
                 level=level,
                 ml=ml,
                 reasons=reasons,
@@ -610,6 +614,48 @@ class Store:
                 readings_per_machine=600,
             ),
             server_time=now,
+        )
+
+    def log_operation(self, kind, detail):
+        with self.tx() as c:
+            c.execute(
+                "INSERT INTO operations_log(at,kind,detail) VALUES(?,?,?)",
+                (time.time(), kind, detail),
+            )
+            c.execute(
+                "DELETE FROM operations_log WHERE id NOT IN (SELECT id FROM operations_log ORDER BY id DESC LIMIT 100)"
+            )
+
+    def operations(self):
+        with self.tx() as c:
+            groups = [
+                dict(r)
+                for r in c.execute(
+                    "SELECT priority,COUNT(*) AS count,SUM(LENGTH(CAST(body AS BLOB))) AS bytes FROM outbox GROUP BY priority ORDER BY priority DESC"
+                )
+            ]
+            latest = [
+                dict(r)
+                for r in c.execute(
+                    "SELECT at,kind,detail FROM operations_log ORDER BY id DESC LIMIT 12"
+                )
+            ]
+            events = [
+                dict(r)
+                for r in c.execute(
+                    "SELECT id,machine,kind,status,priority,created,acknowledged,bytes FROM event_audit ORDER BY rowid DESC LIMIT 8"
+                )
+            ]
+            oldest = c.execute(
+                "SELECT MIN(created) FROM event_audit WHERE status IN ('QUEUED','RETRYING')"
+            ).fetchone()[0]
+            readings = c.execute("SELECT COUNT(*) FROM readings").fetchone()[0]
+        return dict(
+            queue_by_priority=groups,
+            oldest_pending_seconds=max(0, time.time() - oldest) if oldest else 0,
+            retained_readings=readings,
+            timeline=latest,
+            recent_events=events,
         )
 
     def data_flow(self, machine=None, limit=100, cloud=False):
