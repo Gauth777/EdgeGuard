@@ -58,3 +58,11 @@ Scenario Lab is authenticated and enabled only by EDGEGUARD_ENABLE_FAULTS=1. It 
 ### Remaining validation
 
 Hardware calibration, representative fleet load, long outage storage limits, Windows resource sampling and Compose/MQTT runtime need validation on the target installation. No interface badge constitutes a certification or a passing test. ML robustness limitations remain documented in ml-report.md.
+
+## Efficiency policy update
+
+The sync worker claims an outbox item before sending, gzip-compresses when beneficial, then accounts/paces using actual transmitted body bytes. A bounded gzip decoder rejects malformed streams and expansion beyond the original 256 KiB API limit. Restart clears in-flight claims for at-least-once retry; a single worker per database remains mandatory.
+
+Unattempted, unclaimed routine summaries for one machine may be replaced by a newer summary in the same transaction. Earlier coverage is explicitly SUPERSEDED, not merged or delivered. Incident records are retained independently. Attempted summaries are exempt from coalescing; existing queue-pressure eviction of routine traffic is still possible. Retry backoff has 50–100% equal jitter under a 30-second cap. Reserved critical bandwidth and byte-budget storage enforcement remain future work.
+
+The measured experiment is isolated from operational data and cloud fault modes. It uses the production Store, SyncWorker, cloud API, decompressor and idempotency path with temporary databases. It uses explicit synthetic sensor time, tests rules only and persists its report in the operational database. A running report interrupted by restart becomes NOT_OBSERVED.

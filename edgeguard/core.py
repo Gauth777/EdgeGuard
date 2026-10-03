@@ -2,6 +2,7 @@
 
 import json
 import math
+import random
 import sqlite3
 import time
 import uuid
@@ -72,6 +73,16 @@ class Store:
                 c.execute("ALTER TABLE cloud_state ADD COLUMN received_at REAL")
             if "event_id" not in columns:
                 c.execute("ALTER TABLE cloud_state ADD COLUMN event_id TEXT")
+            outbox_columns = {r["name"] for r in c.execute("PRAGMA table_info(outbox)")}
+            if "in_flight" not in outbox_columns:
+                c.execute("ALTER TABLE outbox ADD COLUMN in_flight INTEGER DEFAULT 0")
+            c.execute("UPDATE outbox SET in_flight=0")
+            c.execute("CREATE TABLE IF NOT EXISTS experiments(id TEXT PRIMARY KEY, body TEXT NOT NULL)")
+            for row in c.execute("SELECT id,body FROM experiments").fetchall():
+                report = json.loads(row["body"])
+                if report.get("status") == "RUNNING":
+                    report.update(status="NOT_OBSERVED", error="Process restarted before experiment finished; rerun verification")
+                    c.execute("UPDATE experiments SET body=? WHERE id=?", (dumps(report), row["id"]))
             # Existing queued payloads are known facts; older delivered history is not.
             for row in c.execute("SELECT * FROM outbox").fetchall():
                 self.audit_event(
@@ -136,7 +147,7 @@ class Store:
     def prune_audit(self, c):
         # Preserve pending records; bound completed delivery history independently.
         c.execute(
-            "DELETE FROM event_audit WHERE status IN ('ACKNOWLEDGED','RECEIVED','DROPPED') AND id NOT IN (SELECT id FROM event_audit WHERE status IN ('ACKNOWLEDGED','RECEIVED','DROPPED') ORDER BY rowid DESC LIMIT 2000)"
+            "DELETE FROM event_audit WHERE status IN ('ACKNOWLEDGED','RECEIVED','DROPPED','SUPERSEDED') AND id NOT IN (SELECT id FROM event_audit WHERE status IN ('ACKNOWLEDGED','RECEIVED','DROPPED','SUPERSEDED') ORDER BY rowid DESC LIMIT 2000)"
         )
         c.execute(
             "DELETE FROM reading_routes WHERE event_id NOT IN (SELECT id FROM event_audit) OR reading_id NOT IN (SELECT id FROM readings)"
@@ -205,10 +216,17 @@ class Store:
         return body
 
     def enqueue(self, c, kind, body, priority, aggregate_ids=()):
+        if kind == "machine" and priority == 0:
+            # Never replace attempted or in-flight events: the cloud may have saved them.
+            old = c.execute("SELECT o.id FROM outbox o JOIN event_audit a ON a.id=o.id WHERE o.priority=0 AND o.attempts=0 AND o.in_flight=0 AND a.machine=?", (body["id"],)).fetchall()
+            for row in old:
+                c.execute("UPDATE event_audit SET status='SUPERSEDED',error='Replaced by newer routine summary; earlier routine coverage not retained' WHERE id=?", (row["id"],))
+                c.execute("DELETE FROM outbox WHERE id=?", (row["id"],))
+                self.count(c, "routine_events_superseded")
         size = c.execute("SELECT COUNT(*) FROM outbox").fetchone()[0]
         if size >= self.max_queue:
             expendable = c.execute(
-                "SELECT id FROM outbox WHERE priority=0 ORDER BY rowid LIMIT 1"
+                "SELECT id FROM outbox WHERE priority=0 AND in_flight=0 ORDER BY rowid LIMIT 1"
             ).fetchone()
             if expendable:
                 c.execute(
@@ -740,12 +758,14 @@ class Store:
                 )
             ][::-1]
 
-    def pending(self, now=None):
+    def pending(self, now=None, claim=False):
         with self.tx() as c:
             row = c.execute(
-                "SELECT * FROM outbox WHERE due<=? ORDER BY priority DESC,rowid LIMIT 1",
+                "SELECT * FROM outbox WHERE in_flight=0 AND due<=? ORDER BY priority DESC,rowid LIMIT 1",
                 (time.time() if now is None else now,),
             ).fetchone()
+            if row and claim:
+                c.execute("UPDATE outbox SET in_flight=1 WHERE id=?", (row["id"],))
             return dict(row) if row else None
 
     def delivered(self, event_id, byte_count):
@@ -771,10 +791,10 @@ class Store:
                     (attempt, error[:200], event_id),
                 )
                 c.execute(
-                    "UPDATE outbox SET attempts=?,due=?,error=? WHERE id=?",
+                    "UPDATE outbox SET attempts=?,due=?,error=?,in_flight=0 WHERE id=?",
                     (
                         attempt,
-                        time.time() + min(30, 2 ** min(attempt, 5)),
+                        time.time() + random.uniform(0.5, 1.0) * min(30, 2 ** min(attempt, 5)),
                         error[:200],
                         event_id,
                     ),

@@ -1,6 +1,10 @@
 """HTTP edge/cloud processes. Run exactly one worker per SQLite database."""
 
 import asyncio
+import gzip
+import zlib
+import json
+import uuid
 import logging
 import os
 import secrets
@@ -102,6 +106,8 @@ class SyncWorker:
         self.paced = bool(item and time.monotonic() < self.next_send_at)
         if self.paced:
             return
+        if item:
+            item = await asyncio.to_thread(self.store.pending, claim=True)
         try:
             if not item:
                 response = await client.get(self.url + "/health")
@@ -111,28 +117,33 @@ class SyncWorker:
                 self.last_error = None
                 self.network_change("ONLINE")
                 return
-            self.next_send_at = (
-                time.monotonic() + len(item["body"].encode()) / self.bytes_per_second
-            )
+            raw = item["body"].encode()
+            packed = gzip.compress(raw, mtime=0)
+            payload = packed if len(packed) < len(raw) else raw
+            encoding = {"Content-Encoding": "gzip"} if payload is packed else {}
+            self.next_send_at = time.monotonic() + len(payload) / self.bytes_per_second
             with self.store.tx() as c:
                 self.store.count(
-                    c, "attempted_payload_bytes", len(item["body"].encode())
+                    c, "attempted_payload_bytes", len(payload)
                 )
                 self.store.count(
                     c,
                     "retry_payload_bytes" if item["attempts"] else "first_attempt_payload_bytes",
-                    len(item["body"].encode()),
+                    len(payload),
                 )
+                self.store.count(c, "uncompressed_attempt_bytes", len(raw))
+                self.store.count(c, "compression_input_bytes", len(raw))
+                self.store.count(c, "compression_output_bytes", len(payload))
             response = await client.post(
                 self.url + "/api/events",
-                content=item["body"],
-                headers={"X-API-Key": self.key, "Content-Type": "application/json"},
+                content=payload,
+                headers={"X-API-Key": self.key, "Content-Type": "application/json", **encoding},
             )
             response.raise_for_status()
             if response.json().get("ack") != item["id"]:
                 raise ValueError("Cloud returned an unexpected acknowledgement")
             await asyncio.to_thread(
-                self.store.delivered, item["id"], len(item["body"].encode())
+                self.store.delivered, item["id"], len(payload)
             )
             self.status = "SYNCING" if self.store.snapshot()["pending"] else "CONNECTED"
             self.last_success = time.time()
@@ -219,6 +230,18 @@ def create_app(role=None, path=None, key=None, background=True):
                 body.extend(part)
                 if len(body) > 262144:
                     return JSONResponse({"detail": "Payload exceeds 256 KiB"}, 413)
+            if request.headers.get("content-encoding", "identity") == "gzip":
+                try:
+                    decoder = zlib.decompressobj(16 + zlib.MAX_WBITS)
+                    body = decoder.decompress(bytes(body), 262145)
+                    if len(body) > 262144 or decoder.unconsumed_tail:
+                        return JSONResponse({"detail": "Expanded payload exceeds 256 KiB"}, 413)
+                    if not decoder.eof or decoder.unused_data:
+                        return JSONResponse({"detail": "Invalid gzip body"}, 400)
+                except zlib.error:
+                    return JSONResponse({"detail": "Invalid gzip body"}, 400)
+            elif request.headers.get("content-encoding", "identity") != "identity":
+                return JSONResponse({"detail": "Unsupported content encoding"}, 415)
             request._body = bytes(body)
         response = await call_next(request)
         response.headers["X-Content-Type-Options"] = "nosniff"
@@ -281,7 +304,37 @@ def create_app(role=None, path=None, key=None, background=True):
             fault=app.state.fault if role == "cloud" else None,
         )
 
+    @app.get("/api/experiments", dependencies=[Depends(auth)])
+    def experiments():
+        with store.tx() as c:
+            return [json.loads(r["body"]) for r in c.execute("SELECT body FROM experiments ORDER BY rowid DESC LIMIT 5")]
+
     if role == "edge":
+
+        @app.post("/api/testing/experiment", dependencies=[Depends(auth)])
+        async def experiment():
+            require_lab()
+            if getattr(app.state, "experiment_running", False):
+                raise HTTPException(409, "Experiment already running")
+            from .experiment import run_experiment
+            app.state.experiment_running = True
+            run_id = str(uuid.uuid4())
+            with store.tx() as c:
+                c.execute("INSERT INTO experiments VALUES(?,?)", (run_id, json.dumps(dict(id=run_id, status="RUNNING"))))
+            async def execute():
+                try:
+                    result = await run_experiment()
+                    result.update(id=run_id)
+                except Exception as exc:
+                    result = dict(id=run_id, status="FAIL", error=str(exc))
+                finally:
+                    app.state.experiment_running = False
+                with store.tx() as c:
+                    c.execute("UPDATE experiments SET body=? WHERE id=?", (json.dumps(result), run_id))
+                    c.execute("DELETE FROM experiments WHERE id NOT IN (SELECT id FROM experiments ORDER BY rowid DESC LIMIT 5)")
+            tasks[:] = [task for task in tasks if not task.done()]
+            tasks.append(asyncio.create_task(execute()))
+            return {"id": run_id, "status": "RUNNING"}
 
         def require_lab():
             if os.getenv("EDGEGUARD_ENABLE_FAULTS") != "1":

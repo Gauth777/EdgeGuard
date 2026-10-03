@@ -1,4 +1,5 @@
 import asyncio
+import gzip
 import json
 import time
 import uuid
@@ -69,7 +70,7 @@ def test_pacing_and_retry_byte_accounting(tmp_path):
     assert len(requests) == 2
     assert counters['retry_payload_bytes'] > 0
     assert counters['attempted_payload_bytes'] == counters['first_attempt_payload_bytes'] + counters['retry_payload_bytes']
-    assert json.loads(requests[0].content)['id'] == json.loads(requests[1].content)['id']
+    assert json.loads(gzip.decompress(requests[0].content))['id'] == json.loads(gzip.decompress(requests[1].content))['id']
 
 
 def test_lab_auth_enablement_lifecycle_and_budgets(tmp_path, monkeypatch):

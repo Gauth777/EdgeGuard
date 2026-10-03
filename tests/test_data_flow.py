@@ -79,6 +79,7 @@ def test_queue_pressure_is_dropped_not_delivered(tmp_path):
     ts = time.time()
     s.ingest(reading(ts), now=ts)
     first = s.pending()["id"]
+    s.failed(first, "Offline attempt; preserve for retry")
     s.ingest(reading(ts + 16), now=ts + 16)
     s.ingest(reading(ts + 17, temperature=110), now=ts + 17)
     event = next(e for e in s.data_flow()["events"] if e["id"] == first)

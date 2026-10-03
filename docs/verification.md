@@ -33,3 +33,11 @@ A Starlette TestClient deprecation warning is emitted by the pinned dependency s
 - Frontend production build passes. Browser visual verification remains unavailable in this environment.
 - Cloud incident opening time is explicitly labelled and distinct from receipt time. Machine sensor time and receipt time are shown separately, with a stale warning. Cloud Delivery reports unique incoming receipts and duplicate retries rather than edge-only counters.
 - This verifies the code path; it does not establish the cause of an individual laptop's stale data. Check the source machine ID, source completion, local outgoing errors, and cloud fault mode.
+
+## Efficiency and measured experiment — 2026-10-03
+
+- 38 backend tests pass; TypeScript and production build pass.
+- New tests cover gzip cloud ingestion/deduplication, malformed/truncated gzip and decompression size limits, routine replacement preserving incident/attempted/in-flight events, and a full isolated warning → failed cloud requests → critical → offline actions → recovery → sync → lost-ack retry experiment.
+- First observed isolated run: all seven checks passed, six buffered important event IDs all received, no missing IDs; one duplicate attempt ignored; normal 61-reading upload bodies 2,853 B versus 11,529 B uncompressed raw baseline (75.25% reduction). These bytes/timings vary slightly with IDs, timestamps and jitter. This is a combined summary/compression comparison, not an equally compressed raw-stream baseline. No HTTP/TLS overhead is counted.
+- Scenario Lab results are generated at execution, expandable and downloadable, not prefilled from this document. In-process HTTP and accelerated sensor time do not establish real-network, industrial or fleet-scale performance.
+- Prior browser-access limitation remains; visual QA of the new panel has not been completed.
