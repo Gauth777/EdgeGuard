@@ -245,7 +245,7 @@ def create_app(role=None, path=None, key=None, background=True):
             store.snapshot(cloud=role == "cloud"),
             role=role,
             connection=dict(
-                status=worker.status if role == "edge" else "CLOUD",
+                status=worker.status if role == "edge" else ("INGESTION_PAUSED" if app.state.fault == "offline" else "ACCEPTING_EVENTS"),
                 last_success=worker.last_success,
                 error=worker.last_error,
             ),
@@ -257,6 +257,7 @@ def create_app(role=None, path=None, key=None, background=True):
                 threshold=detector.threshold if detector else None,
             ),
             fault_controls=os.getenv("EDGEGUARD_ENABLE_FAULTS") == "1",
+            cloud_fault_mode=app.state.fault if role == "cloud" else None,
         )
 
     @app.get("/api/data-flow", dependencies=[Depends(auth)])

@@ -51,6 +51,8 @@ export type Reading = {
   };
 };
 type Machine = {
+  cloud_received_at?: number | null;
+  cloud_event_id?: string | null;
   id: string;
   label: string;
   health: string;
@@ -65,6 +67,8 @@ type Machine = {
   >;
 };
 type Incident = {
+  cloud_received_at?: number | null;
+  cloud_event_id?: string | null;
   id: string;
   machine: string;
   status: string;
@@ -92,6 +96,8 @@ type Incident = {
   model: string;
 };
 export type State = {
+  last_received_at?: number | null;
+  cloud_fault_mode?: string | null;
   role: string;
   machines: Machine[];
   incidents: Incident[];
@@ -132,6 +138,7 @@ const sensors: Record<string, string> = {
   current: "A",
   rpm: "RPM",
 };
+const dateTime = (n?: number | null) => n ? new Date(n * 1000).toLocaleString() : "Not recorded yet";
 const clock = (n: number) => new Date(n * 1000).toLocaleTimeString();
 const nice = (s: string) => s.replaceAll("_", " ");
 function Badge({ value }: { value: string }) {
@@ -396,6 +403,11 @@ function App() {
           </div>
         </header>
         <section className="content">
+          {!local && <div className={"banner " + (state.cloud_fault_mode === "offline" ? "bad" : "")} role="status">
+            <strong>{state.cloud_fault_mode === "offline" ? "Cloud ingestion paused — this console shows saved data." : "Cloud receiver enabled — showing only received data."}</strong>
+            <p>Latest unique event received: {dateTime(state.last_received_at)}. Receiver availability does not confirm an active edge connection. Machine summaries arrive about every 15 seconds while the source runs; incident updates arrive separately.</p>
+            {state.cloud_fault_mode === "lose_ack" && <p>The next event will be saved but its acknowledgement withheld for the retry exercise.</p>}
+          </div>}
           <div className="page-heading">
             <div>
               <div className="eyebrow">
@@ -649,10 +661,16 @@ function App() {
               {!machine ? (
                 <Empty
                   title="No machine selected"
-                  text="Register a machine from Overview to start monitoring."
+                  text={local ? "Register a machine from Overview to start monitoring." : "No machine summary received yet. Check the machine ID in local Scenario Lab, then local Delivery for pending events or errors."}
                 />
               ) : (
                 <>
+                  {!local && <div className={"banner " + (machine.stale ? "bad" : "")}>
+                    <strong>{machine.id} · {machine.stale ? "STALE — no fresh machine snapshot received" : "Recent machine snapshot"}</strong>
+                    <p>Sensor measured: {dateTime(machine.latest?.timestamp)} · This version received: {dateTime(machine.cloud_received_at)}</p>
+                    <p>{machine.stale ? "Check local Scenario Lab's machine ID and source status, restore the cloud link, then inspect local Delivery. An incident can sync before routine telemetry." : "These are received snapshots, not a direct live connection to the sensors."}</p>
+                    <small>Receipt event: {machine.cloud_event_id || "Legacy snapshot — receipt metadata becomes available on the next newer update"}</small>
+                  </div>}
                   <div className="sensor-grid">
                     {Object.entries(sensors).map(([s, unit]) => (
                       <button
@@ -863,9 +881,14 @@ function App() {
                     </div>
                     <h2>{incident.machine} / Incident</h2>
                     <p className="mono">
-                      {incident.id.slice(0, 8)} · {clock(incident.opened_at)} ·
+                      {incident.id.slice(0, 8)} · Opened {dateTime(incident.opened_at)} ·
                       revision {incident.version}
                     </p>
+                    {!local && <div className="subtle-note">
+                      <strong>This incident version received: {dateTime(incident.cloud_received_at)}</strong>
+                      <p>Opened is the original trigger time; it does not change when an unclosed incident resumes or is acknowledged. Compare revision {incident.version} with the local incident.</p>
+                      <small>Receipt event: {incident.cloud_event_id || "Legacy version — not recorded"}</small>
+                    </div>}
                     <h4>Trigger evidence</h4>
                     {incident.reasons.map((r, j) => (
                       <div className="reason" key={j}>
@@ -1007,7 +1030,16 @@ function App() {
             </div>
           )}
           {tab === "Data Flow" && <DataFlow accessKey={key} machines={state.machines}/>}
-          {tab === "Delivery" && (
+          {tab === "Delivery" && !local && <div className="panel padded">
+            <h3>Cloud receipt monitor</h3>
+            <p>The outgoing queue belongs to the edge. This node reports incoming receipts.</p>
+            <div className="stat-row"><span>Unique events received</span><strong>{state.counters.unique_events_received || 0}</strong></div>
+            <div className="stat-row"><span>Duplicate retries ignored</span><strong>{state.counters.duplicates_ignored || 0}</strong></div>
+            <div className="stat-row"><span>Latest unique receipt</span><strong>{dateTime(state.last_received_at)}</strong></div>
+            <button className="secondary" onClick={() => setTab("Data Flow")}>Inspect received event IDs and payloads</button>
+            {state.fault_controls && <div className="actions">{["offline", "lose_ack", "online"].map(mode => <button className="secondary" disabled={busy} key={mode} onClick={() => void mutate("/testing/fault", {mode})}>{nice(mode)}</button>)}</div>}
+          </div>}
+          {tab === "Delivery" && local && (
             <>
               <div className="metrics">
                 <Metric
@@ -1209,7 +1241,7 @@ function IncidentList({
           <div>
             <strong>{i.machine}</strong>
             <small>
-              {clock(i.opened_at)} · {i.id.slice(0, 8)}
+              Opened {dateTime(i.opened_at)} · {i.id.slice(0, 8)} · v{i.version}
             </small>
           </div>
           <Badge value={i.severity} />

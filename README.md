@@ -186,3 +186,9 @@ npm run build --prefix frontend
 Keep existing `.env`, databases and model files. No retraining is required for this UI update. Optional `EDGEGUARD_UPLOAD_BPS=32768` controls average upload payload pacing. CPU/RAM are measured on native runs; Compose configures one CPU and 512 MiB per application service. Native memory is not capped by the dashboard's budget indicator.
 
 Try **Scenario Lab → Critical machine event**, wait for the incident, disconnect the cloud, then open **Overview**. Observe local critical readings and queued events, acknowledge in **Incidents**, reconnect, and inspect acknowledged event IDs in **Data Flow**. Retry backoff and low-bandwidth pacing can delay draining; restoration is not an instant-delivery guarantee.
+
+### If the cloud appears stuck
+
+Check the machine ID displayed in local Scenario Lab: without a loaded synthetic model, it uses `LAB-01`, not `ML-01`. Sources finish after 120 seconds by default. A cloud machine snapshot becomes stale after 35 seconds without fresh telemetry. The timestamp labelled **Opened** on an incident is its original trigger time, including when an unclosed incident resumes.
+
+Cloud Machine now distinguishes sensor measurement time from the receipt time of that version. Cloud Incidents shows the received revision and receipt event ID. Cloud Delivery reports incoming receipts, and the global banner exposes injected ingestion pauses. Restore the cloud in local Scenario Lab or cloud Delivery, then inspect local Delivery for retries/errors. Priority incident updates may arrive before routine machine summaries. Existing cloud records show unknown per-version receipt metadata until a newer update arrives; databases migrate automatically without deleting records.

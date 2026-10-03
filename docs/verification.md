@@ -26,3 +26,10 @@ A Starlette TestClient deprecation warning is emitted by the pinned dependency s
 - TypeScript and Vite production build pass. Bundle-size advisory remains (~653 kB minified JS).
 - Browser visual verification of this redesign was blocked: the cloud browser refused the local preview URL with ERR_BLOCKED_BY_CLIENT. No new claim of desktop/mobile visual QA is made.
 - Docker enforcement, Windows runtime measurements, MQTT and representative hundreds-of-machine capacity have not been newly verified. Process resource metrics are instrumentation, not benchmark results.
+
+## Cloud visibility correction — 2026-10-03
+
+- Existing 32 tests pass; three additional cloud tests pass (35 total): persisted receipt metadata for the applied incident revision, delayed-version/duplicate safety, legacy SQLite migration without fabricated timestamps, and visible cloud fault mode.
+- Frontend production build passes. Browser visual verification remains unavailable in this environment.
+- Cloud incident opening time is explicitly labelled and distinct from receipt time. Machine sensor time and receipt time are shown separately, with a stale warning. Cloud Delivery reports unique incoming receipts and duplicate retries rather than edge-only counters.
+- This verifies the code path; it does not establish the cause of an individual laptop's stale data. Check the source machine ID, source completion, local outgoing errors, and cloud fault mode.

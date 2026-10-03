@@ -67,6 +67,11 @@ class Store:
             CREATE INDEX IF NOT EXISTS audit_machine ON event_audit(machine,created);
             CREATE TABLE IF NOT EXISTS reading_routes(reading_id TEXT NOT NULL, event_id TEXT NOT NULL, representation TEXT NOT NULL, PRIMARY KEY(reading_id,event_id,representation));
             """)
+            columns = {r["name"] for r in c.execute("PRAGMA table_info(cloud_state)")}
+            if "received_at" not in columns:
+                c.execute("ALTER TABLE cloud_state ADD COLUMN received_at REAL")
+            if "event_id" not in columns:
+                c.execute("ALTER TABLE cloud_state ADD COLUMN event_id TEXT")
             # Existing queued payloads are known facts; older delivered history is not.
             for row in c.execute("SELECT * FROM outbox").fetchall():
                 self.audit_event(
@@ -564,8 +569,8 @@ class Store:
         with self.tx() as c:
             if cloud:
                 all_items = [
-                    (r["kind"], json.loads(r["body"]))
-                    for r in c.execute("SELECT kind,body FROM cloud_state")
+                    (r["kind"], dict(json.loads(r["body"]), cloud_received_at=r["received_at"], cloud_event_id=r["event_id"]))
+                    for r in c.execute("SELECT kind,body,received_at,event_id FROM cloud_state")
                 ]
                 machines = [b for k, b in all_items if k == "machine"]
                 incidents = [b for k, b in all_items if k == "incident"]
@@ -600,6 +605,7 @@ class Store:
                 r["key"]: r["value"] for r in c.execute("SELECT * FROM counters")
             }
             pending = c.execute("SELECT COUNT(*) FROM outbox").fetchone()[0]
+            last_received = c.execute("SELECT MAX(at) FROM receipts").fetchone()[0] if cloud else None
         return dict(
             machines=machines,
             incidents=incidents,
@@ -614,6 +620,7 @@ class Store:
                 readings_per_machine=600,
             ),
             server_time=now,
+            last_received_at=last_received,
         )
 
     def log_operation(self, kind, detail):
@@ -790,12 +797,14 @@ class Store:
                     "INSERT INTO receipts VALUES(?,?)", (event["id"], time.time())
                 )
                 c.execute(
-                    "INSERT INTO cloud_state VALUES(?,?,?,?) ON CONFLICT(id) DO UPDATE SET version=excluded.version,kind=excluded.kind,body=excluded.body WHERE excluded.version>cloud_state.version",
+                    "INSERT INTO cloud_state(id,version,kind,body,received_at,event_id) VALUES(?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET version=excluded.version,kind=excluded.kind,body=excluded.body,received_at=excluded.received_at,event_id=excluded.event_id WHERE excluded.version>cloud_state.version",
                     (
                         event["entity_id"],
                         event["version"],
                         event["kind"],
                         dumps(event["payload"]),
+                        time.time(),
+                        event["id"],
                     ),
                 )
                 self.count(c, "unique_events_received")
