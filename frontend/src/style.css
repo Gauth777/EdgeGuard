@@ -989,3 +989,41 @@ textarea {
     overflow: auto;
   }
 }
+
+/* Database-backed data flow inspection */
+.data-flow { display: grid; gap: 20px; min-width: 0; }
+.flow-toolbar { display:flex; gap:12px; align-items:end; flex-wrap:wrap; }
+.flow-toolbar label { font-size:12px; color:#516176; display:grid; gap:7px; }
+.flow-toolbar select { background:white; border:1px solid #d5dee6; border-radius:7px; padding:10px; max-width:280px; color:#233044; }
+.flow-toolbar button { display:flex; align-items:center; gap:7px; border:1px solid #d5dee6; background:white; padding:11px 14px; border-radius:7px; font-size:12px; }
+.flow-storage { display:flex; align-items:center; gap:12px; color:#256857; }
+.flow-storage strong { font-size:14px; }
+.flow-metrics { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:14px; }
+.flow-metrics > div { display:grid; gap:8px; padding:20px; background:white; border:1px solid #e1e7ec; border-radius:10px; }
+.flow-metrics span { font-size:12px; color:#63748a; }
+.flow-metrics strong { font-size:25px; }
+.data-flow small { display:block; font-size:11px; color:#627287; overflow-wrap:anywhere; }
+.flow-policy { padding:18px 22px; background:#edf4f2; border:1px solid #d5e6df; border-radius:9px; }
+.flow-policy p { margin-top:7px; color:#526c61; }
+.flow-panel { border:1px solid #e0e6ec; border-radius:10px; background:white; overflow:hidden; min-width:0; }
+.flow-panel-heading { padding:20px; border-bottom:1px solid #e5eaf0; }
+.flow-scroll { overflow-x:auto; }
+.data-flow table { width:100%; border-collapse:collapse; font-size:12px; }
+.data-flow th { padding:13px 16px; background:#f8fafb; font-size:11px; color:#697b90; text-align:left; font-weight:600; }
+.data-flow td { padding:16px; border-top:1px solid #edf0f3; vertical-align:top; min-width:160px; max-width:350px; }
+.data-flow td p { font-size:12px; line-height:1.6; margin:6px 0; }
+.flow-value { display:flex; justify-content:space-between; gap:18px; white-space:nowrap; padding:2px 0; }
+.flow-value span { color:#708096; }
+.flow-tag { display:inline-block; font-size:10px; padding:3px 6px; margin:2px 4px 2px 0; background:#edf1f5; border-radius:4px; color:#586b82; font-weight:600; }
+.flow-valid,.flow-normal,.flow-acknowledged,.flow-received { background:#e3f3eb; color:#267553; }
+.flow-critical,.flow-invalid,.flow-dropped { background:#fbe8e8; color:#a33737; }
+.flow-warning,.flow-retrying,.flow-missing,.flow-stale { background:#fff1d7; color:#936019; }
+.flow-queued { background:#e7efff; color:#4366a0; }
+.data-flow summary { cursor:pointer; color:#315e84; padding:5px 0; font-size:12px; }
+.data-flow code { font-size:10px; overflow-wrap:anywhere; word-break:break-all; }
+.flow-route { border-top:1px solid #dfe6ee; padding:9px 0; }
+.flow-empty { padding:32px 20px; }
+.flow-error { background:#fff0ed; padding:12px; border-radius:7px; color:#a84632; }
+.flow-footnote { font-size:11px; }
+@media (max-width:1000px) { .flow-metrics {grid-template-columns:repeat(2,minmax(0,1fr));} }
+@media (max-width:600px) { .flow-metrics {grid-template-columns:1fr;} .flow-toolbar label,.flow-toolbar select {width:100%; max-width:none;} }

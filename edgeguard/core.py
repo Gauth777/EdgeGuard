@@ -62,7 +62,79 @@ class Store:
             CREATE TABLE IF NOT EXISTS receipts(id TEXT PRIMARY KEY, at REAL NOT NULL);
             CREATE TABLE IF NOT EXISTS cloud_state(id TEXT PRIMARY KEY, version INTEGER NOT NULL, kind TEXT NOT NULL, body TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS counters(key TEXT PRIMARY KEY, value REAL NOT NULL);
+            CREATE TABLE IF NOT EXISTS event_audit(id TEXT PRIMARY KEY, machine TEXT NOT NULL, kind TEXT NOT NULL, priority INTEGER NOT NULL, status TEXT NOT NULL, attempts INTEGER NOT NULL DEFAULT 0, created REAL NOT NULL, acknowledged REAL, error TEXT, bytes INTEGER NOT NULL, detail TEXT NOT NULL);
+            CREATE INDEX IF NOT EXISTS audit_machine ON event_audit(machine,created);
+            CREATE TABLE IF NOT EXISTS reading_routes(reading_id TEXT NOT NULL, event_id TEXT NOT NULL, representation TEXT NOT NULL, PRIMARY KEY(reading_id,event_id,representation));
             """)
+            # Existing queued payloads are known facts; older delivered history is not.
+            for row in c.execute("SELECT * FROM outbox").fetchall():
+                self.audit_event(
+                    c,
+                    json.loads(row["body"]),
+                    row["priority"],
+                    "RETRYING" if row["attempts"] else "QUEUED",
+                    row["attempts"],
+                    row["error"],
+                )
+
+    def audit_event(self, c, event, priority, status, attempts=0, error=None):
+        p = event["payload"]
+        machine = p["id"] if event["kind"] == "machine" else p["machine"]
+        detail = {
+            k: p[k]
+            for k in (
+                "summary",
+                "summary_window",
+                "severity",
+                "status",
+                "reasons",
+                "capture_complete",
+            )
+            if k in p
+        }
+        detail["entity_id"] = event["entity_id"]
+        detail["version"] = event["version"]
+        detail["evidence_samples"] = len(p.get("pre", [])) + len(p.get("evidence", []))
+        c.execute(
+            "INSERT OR IGNORE INTO event_audit VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+            (
+                event["id"],
+                machine,
+                event["kind"],
+                priority,
+                status,
+                attempts,
+                time.time(),
+                time.time() if status == "RECEIVED" else None,
+                error,
+                len(dumps(event).encode()),
+                dumps(detail),
+            ),
+        )
+        refs = []
+        if event["kind"] == "machine" and (p.get("latest") or {}).get("message_id"):
+            refs.append((p["latest"]["message_id"], "LATEST_SNAPSHOT"))
+        if p.get("trigger_message_id"):
+            refs.append((p["trigger_message_id"], "INCIDENT_NOTIFICATION"))
+        refs.extend(
+            (r["message_id"], "INCIDENT_EVIDENCE")
+            for r in p.get("pre", []) + p.get("evidence", [])
+            if r.get("message_id")
+        )
+        c.executemany(
+            "INSERT OR IGNORE INTO reading_routes VALUES(?,?,?)",
+            [(rid, event["id"], representation) for rid, representation in refs],
+        )
+        self.prune_audit(c)
+
+    def prune_audit(self, c):
+        # Preserve pending records; bound completed delivery history independently.
+        c.execute(
+            "DELETE FROM event_audit WHERE status IN ('ACKNOWLEDGED','RECEIVED','DROPPED') AND id NOT IN (SELECT id FROM event_audit WHERE status IN ('ACKNOWLEDGED','RECEIVED','DROPPED') ORDER BY rowid DESC LIMIT 2000)"
+        )
+        c.execute(
+            "DELETE FROM reading_routes WHERE event_id NOT IN (SELECT id FROM event_audit) OR reading_id NOT IN (SELECT id FROM readings)"
+        )
 
     @contextmanager
     def tx(self):
@@ -126,13 +198,17 @@ class Store:
             c.execute("INSERT INTO machines VALUES(?,?)", (machine, dumps(body)))
         return body
 
-    def enqueue(self, c, kind, body, priority):
+    def enqueue(self, c, kind, body, priority, aggregate_ids=()):
         size = c.execute("SELECT COUNT(*) FROM outbox").fetchone()[0]
         if size >= self.max_queue:
             expendable = c.execute(
                 "SELECT id FROM outbox WHERE priority=0 ORDER BY rowid LIMIT 1"
             ).fetchone()
             if expendable:
+                c.execute(
+                    "UPDATE event_audit SET status='DROPPED',error='Routine event evicted under queue pressure' WHERE id=?",
+                    (expendable["id"],),
+                )
                 c.execute("DELETE FROM outbox WHERE id=?", (expendable["id"],))
                 self.count(c, "routine_events_dropped")
             elif priority == 0:
@@ -145,6 +221,7 @@ class Store:
                 )
         event = dict(
             id=str(uuid.uuid4()),
+            priority=priority,
             kind=kind,
             version=body["version"],
             entity_id=body["id"],
@@ -155,6 +232,11 @@ class Store:
             (event["id"], priority, dumps(event)),
         )
         self.count(c, "events_created")
+        self.audit_event(c, event, priority, "QUEUED")
+        c.executemany(
+            "INSERT OR IGNORE INTO reading_routes VALUES(?,?,?)",
+            [(rid, event["id"], "AGGREGATE") for rid in aggregate_ids],
+        )
 
     def save_incident(self, c, incident, priority=2):
         incident["version"] += 1
@@ -258,7 +340,14 @@ class Store:
                         level = "WARNING"
             elif detector:
                 ml["status"] = "INSUFFICIENT_DATA"
-            reading = dict(message, quality=quality, level=level, ml=ml)
+            reading = dict(
+                message,
+                quality=quality,
+                level=level,
+                ml=ml,
+                reasons=reasons,
+                decision_version=1,
+            )
             c.execute(
                 "INSERT INTO readings VALUES(?,?,?,?)",
                 (message["message_id"], mid, ts, dumps(reading)),
@@ -322,6 +411,7 @@ class Store:
                     status="OPEN",
                     severity=level,
                     opened_at=ts,
+                    trigger_message_id=message["message_id"],
                     reasons=reasons,
                     limits=m["limits"],
                     model=ml.get("model", "none"),
@@ -395,13 +485,28 @@ class Store:
                         if values
                         else None
                     )
-                self.enqueue(c, "machine", dict(m, summary=summary), 0)
+                self.enqueue(
+                    c,
+                    "machine",
+                    dict(
+                        m,
+                        summary=summary,
+                        summary_window=dict(start=ts - 15, end=ts, samples=len(window)),
+                    ),
+                    0,
+                    [
+                        r["message_id"]
+                        for r in window
+                        if "VALID" in r["quality"].values()
+                    ],
+                )
                 m["last_summary"] = now
             c.execute("UPDATE machines SET body=? WHERE id=?", (dumps(m), mid))
             c.execute(
                 "DELETE FROM readings WHERE machine=? AND id NOT IN (SELECT id FROM readings WHERE machine=? ORDER BY ts DESC LIMIT 600)",
                 (mid, mid),
             )
+            self.prune_audit(c)
         return {"duplicate": False, "machine": m}
 
     def action(self, incident_id, action, note=""):
@@ -507,6 +612,71 @@ class Store:
             server_time=now,
         )
 
+    def data_flow(self, machine=None, limit=100, cloud=False):
+        """Read persisted observations and actual transport facts, never infer delivery."""
+        with self.tx() as c:
+            where, args = (" WHERE machine=?", (machine,)) if machine else ("", ())
+            readings = (
+                []
+                if cloud
+                else [
+                    json.loads(r["body"])
+                    for r in c.execute(
+                        "SELECT body FROM readings"
+                        + where
+                        + " ORDER BY ts DESC LIMIT ?",
+                        (*args, limit),
+                    )
+                ]
+            )
+            for reading in readings:
+                reading["routes"] = [
+                    dict(r)
+                    for r in c.execute(
+                        "SELECT a.id,a.kind,a.status,a.attempts,a.acknowledged,a.error,r.representation FROM reading_routes r JOIN event_audit a ON a.id=r.event_id WHERE r.reading_id=? ORDER BY a.rowid DESC",
+                        (reading["message_id"],),
+                    )
+                ]
+            events = []
+            for row in c.execute(
+                "SELECT * FROM event_audit" + where + " ORDER BY rowid DESC LIMIT 50",
+                args,
+            ):
+                event = dict(row)
+                event["detail"] = json.loads(event["detail"])
+                events.append(event)
+            storage = dict(
+                readings=c.execute(
+                    "SELECT COUNT(*) FROM readings" + where, args
+                ).fetchone()[0],
+                incidents=c.execute(
+                    "SELECT COUNT(*) FROM incidents" + where, args
+                ).fetchone()[0]
+                if not cloud
+                else c.execute(
+                    "SELECT COUNT(*) FROM cloud_state WHERE kind='incident'"
+                ).fetchone()[0],
+                queued=c.execute("SELECT COUNT(*) FROM outbox").fetchone()[0],
+                receipts=c.execute("SELECT COUNT(*) FROM receipts").fetchone()[0],
+                file_bytes=Path(self.path).stat().st_size
+                + sum(
+                    p.stat().st_size for p in [Path(self.path + "-wal")] if p.exists()
+                ),
+            )
+            counters = {
+                r["key"]: r["value"] for r in c.execute("SELECT * FROM counters")
+            }
+        return dict(
+            role="cloud" if cloud else "edge",
+            readings=readings,
+            events=events,
+            storage=storage,
+            counters=counters,
+            machine=machine,
+            read_at=time.time(),
+            retention=dict(readings_per_machine=600, completed_events=2000),
+        )
+
     def history(self, machine):
         with self.tx() as c:
             return [
@@ -527,9 +697,14 @@ class Store:
 
     def delivered(self, event_id, byte_count):
         with self.tx() as c:
+            c.execute(
+                "UPDATE event_audit SET status='ACKNOWLEDGED',acknowledged=?,error=NULL WHERE id=?",
+                (time.time(), event_id),
+            )
             c.execute("DELETE FROM outbox WHERE id=?", (event_id,))
             self.count(c, "events_delivered")
             self.count(c, "delivered_payload_bytes", byte_count)
+            self.prune_audit(c)
 
     def failed(self, event_id, error):
         with self.tx() as c:
@@ -538,6 +713,10 @@ class Store:
             ).fetchone()
             if row:
                 attempt = row["attempts"] + 1
+                c.execute(
+                    "UPDATE event_audit SET status='RETRYING',attempts=?,error=? WHERE id=?",
+                    (attempt, error[:200], event_id),
+                )
                 c.execute(
                     "UPDATE outbox SET attempts=?,due=?,error=? WHERE id=?",
                     (
@@ -555,6 +734,12 @@ class Store:
                 "SELECT 1 FROM receipts WHERE id=?", (event["id"],)
             ).fetchone()
             if not exists:
+                self.audit_event(
+                    c,
+                    event,
+                    event.get("priority") if event.get("priority") is not None else -1,
+                    "RECEIVED",
+                )
                 c.execute(
                     "INSERT INTO receipts VALUES(?,?)", (event["id"], time.time())
                 )

@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Literal
 
 import httpx
-from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field
@@ -42,6 +42,7 @@ class Action(BaseModel):
 
 
 class Event(BaseModel):
+    priority: int | None = Field(default=None, ge=0, le=3)
     id: str = Field(min_length=1, max_length=80)
     entity_id: str = Field(min_length=1, max_length=80)
     kind: Literal["machine", "incident"]
@@ -202,6 +203,12 @@ def create_app(role=None, path=None, key=None, background=True):
             ),
             fault_controls=os.getenv("EDGEGUARD_ENABLE_FAULTS") == "1",
         )
+
+    @app.get("/api/data-flow", dependencies=[Depends(auth)])
+    def data_flow(
+        machine: str | None = None, limit: int = Query(default=100, ge=1, le=100)
+    ):
+        return store.data_flow(machine, limit, cloud=role == "cloud")
 
     if role == "edge":
 

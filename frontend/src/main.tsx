@@ -27,6 +27,7 @@ import {
   CartesianGrid,
 } from "recharts";
 import "./style.css";
+import DataFlow from "./DataFlow";
 
 type ModelSignal = {
   sensor: string;
@@ -329,6 +330,7 @@ function App() {
             ["Overview", Boxes],
             ["Machine", Activity],
             ["Incidents", AlertTriangle],
+            ["Data Flow", Database],
             ["Delivery", Cloud],
           ].map(([name, Icon]) => (
             <button
@@ -405,7 +407,7 @@ function App() {
                     ? "Machine intelligence"
                     : tab === "Incidents"
                       ? "Incident workspace"
-                      : "Delivery & recovery"}
+                      : tab === "Data Flow" ? "Readings & data flow" : "Delivery & recovery"}
               </h1>
               <p>
                 {tab === "Overview"
@@ -414,7 +416,7 @@ function App() {
                     ? "Inspect the measurements behind every decision."
                     : tab === "Incidents"
                       ? "Follow the evidence from detection through recovery."
-                      : "Know what is waiting, what was retried and what reached the cloud."}
+                      : tab === "Data Flow" ? "Inspect saved readings, selection decisions and real delivery receipts." : "Know what is waiting, what was retried and what reached the cloud."}
               </p>
             </div>
             {local && tab === "Overview" && (
@@ -999,6 +1001,7 @@ function App() {
               </div>
             </div>
           )}
+          {tab === "Data Flow" && <DataFlow accessKey={key} machines={state.machines}/>}
           {tab === "Delivery" && (
             <>
               <div className="metrics">

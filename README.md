@@ -124,6 +124,19 @@ Set `EDGEGUARD_MODEL=data/model.joblib` and `EDGEGUARD_MODEL_MACHINE=<your-machi
 - **Machine:** five measurements, raw history, thresholds and model status. Invalid samples make chart gaps. Cloud shows received summaries instead of reading the edge database.
 - **Incidents:** reasons, acknowledgement, notes, recovery, close action, evidence export and timeline.
 - **Delivery:** persistent queue, priority, retries and byte accounting. Attempted payload bytes include evidence and retries; no fabricated bandwidth-saving percentage.
+- **Data Flow:** database-backed raw readings, quality at ingestion, saved rule/ML reasons, and actual links to summary, snapshot, notification and evidence events. Expand a reading to inspect event IDs, retries and acknowledgements. Filter by machine/condition, pause updates, or export the displayed database snapshot as JSON. The cloud view shows only received event records and their summary statistics.
+
+### Inspect persistence and data selection
+
+After updating, stop the services, run `git pull`, rebuild with `npm ci --prefix frontend` and `npm run build --prefix frontend`, then restart with `python -m scripts.run` (use your virtual environment's interpreter). Existing databases are upgraded automatically; do not delete `data/` or rerun model training for this UI update.
+
+1. Open **Data Flow** locally and start a publisher. Each accepted message appears with its saved measurements, quality flags and detection reason. Normal readings remain locally available; valid values are represented in periodic summaries, alongside a latest-reading snapshot.
+2. Expand **Transmission ledger → Inspect payload facts** to see real min/max/mean/count values and how many readings the summary window covered. A summary acknowledgement does not imply upload of every raw sample.
+3. Start an incident and interrupt cloud ingestion. Local readings continue accumulating and events show queued/retrying. After reconnecting, their stable event IDs become acknowledged.
+4. Use **lose ack** to observe the distinction: the cloud has a received record while the edge still shows retrying. After a successful retry the edge shows acknowledged, with one unique cloud receipt.
+5. Restart the services. Saved readings and delivery records remain inspectable. The file-size card measures the SQLite database plus its current WAL transaction log, not historical readings processed.
+
+The read-only `/api/data-flow` endpoint requires the node key, optionally filters by `machine`, and returns up to 100 recent raw readings and 50 recent events. A condition filter applies to those 100 readings. Local raw retention remains 600 readings per machine. Delivery tracking retains the latest 2,000 completed events plus pending events; older links may expire. Older delivered events and old detection reasons are not reconstructed. Existing pending events are backfilled from their actual payloads where possible. The dashboard explicitly reports missing tracking history instead of assuming delivery. All-machine cumulative counters are labelled separately from filtered stored-row counts.
 
 The edge owns edits. Cloud is read-only. Acknowledgement is not recovery. Five consecutive complete normal readings mark recovery; closing also requires fresh readings and a completed capture window.
 
