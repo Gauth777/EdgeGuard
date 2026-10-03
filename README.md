@@ -73,17 +73,50 @@ python -m scripts.publish --mqtt-host 127.0.0.1 --scenario incident
 
 The adapter subscribes to `edgeguard/+/telemetry` with a persistent QoS 1 session and acknowledges a delivery only after the edge accepts it (or rejects malformed data). MQTT publishers must set QoS 1. The broker is published only on localhost and is anonymous for that local pilot. Configure broker authentication, per-device ACLs and TLS before changing its network binding. Broker persistence autosaves every 30 seconds; this is not a zero-loss power-failure guarantee. Docker/MQTT integration has not been executed in the development environment because no Docker daemon is available.
 
-## Optional edge ML
+## Edge ML: reproducible synthetic evaluation
 
-The default is **rules active / ML not calibrated**, not a synthetic model disguised as a production detector. Use a CSV of operator-reviewed normal operation with columns `temperature,vibration,pressure,current,rpm`:
+The default remains rules-only until you explicitly enable a model. To run the ML demonstration on the native Python launcher, stop the services, pull the update, and run:
+
+```powershell
+git pull
+npm run build --prefix frontend
+.\.venv\Scripts\python.exe -m scripts.setup_ml
+.\.venv\Scripts\python.exe -m scripts.run
+```
+
+`setup_ml` trains on 2,400 synthetic normal rows, calibrates the score threshold using 1,200 separate normal rows, evaluates seven scenarios with four held-out seeds each through the real ingestion engine, saves `data/ml-evaluation.json`, and updates only the model path/machine entries in `.env`. Your access key and outage-test setting remain unchanged. It binds the model to **ML-01**. A synthetic model is not industrial calibration.
+
+In another terminal:
+
+```powershell
+.\.venv\Scripts\python.exe -m scripts.publish --profile synthetic --scenario subthreshold --machine ML-01 --seconds 120
+```
+
+Open **Machine → ML-01**. From about 15 seconds, abnormal generated readings remain below every rule threshold, but should produce an ML warning and an incident after filtering/debounce. At 55 seconds readings return to the synthetic normal profile. The UI shows the synthetic-data label, model version, calibrated score margin and any values outside its training reference range. **A negative margin is unusual, not a failure probability.**
+
+Available synthetic scenarios: `normal`, `incident` (critical rule breach), `noise`, `missing`, `subthreshold`, `combination`, `healthy_shift`. Use `--profile synthetic` with this model. The legacy publisher has a different normal distribution and can legitimately be flagged as unfamiliar. `healthy_shift` intentionally demonstrates that a healthy new operating regime can cause ML false alerts.
+
+Evaluation alone, without changing `.env`:
+
+```sh
+python -m scripts.evaluate_ml
+```
+
+Measured results and limitations: [ML evaluation report](docs/ml-report.md). The initial held-out synthetic evaluation caught 4/4 subthreshold and 4/4 combination episodes that rules missed, but also started 2 false incidents during 10 minutes of normal sequences and 5 during the healthy-shift sequences. These are small synthetic tests, not industrial accuracy estimates. Model-based warnings require operator investigation; never equate statistical novelty with confirmed failure.
+
+To return to rules-only, remove `EDGEGUARD_MODEL` and `EDGEGUARD_MODEL_MACHINE` from `.env` and restart. This setup workflow configures the native launcher; it does not mount model files into Docker's named volumes.
+
+### Train from reviewed equipment data
+
+Use a CSV of operator-reviewed normal operation with columns `temperature,vibration,pressure,current,rpm`. An optional `timestamp` column must strictly increase; without it, 1 Hz is assumed.
 
 ```sh
 python -m scripts.train normal.csv --output data/model.joblib
 ```
 
-The script needs at least 200 complete rows, trains 64 trees with one CPU thread, and reports a false-alert fraction on the last chronological 20% of normal rows. This is not anomaly recall or evidence of predictive maintenance. Validate independently with real abnormal sequences and operating modes before enabling.
+At least 600 complete rows are required. The first 60% trains the model; the next 20% calibrates the anomaly threshold; the final 20% is a normal-only holdout. The causal median preprocessing matches live inference, and history resets at each partition. Train only on complete, finite values in the accepted sensor ranges. The holdout flag fraction is not failure recall. Independent abnormal sequences and operating-mode validation are still required.
 
-Set `EDGEGUARD_MODEL=data/model.joblib` and `EDGEGUARD_MODEL_MACHINE=M-01` in `.env`, then restart. Models are bound to one machine. The median of up to five recent valid samples feeds the model; raw fresh values always feed rules. The decision score is not a probability. Only load trusted local joblib files.
+Set `EDGEGUARD_MODEL=data/model.joblib` and `EDGEGUARD_MODEL_MACHINE=<your-machine-id>` in `.env`, then restart. One model is bound to one machine. 64 trees, max 256 training samples per tree, one CPU thread. Missing inputs suspend inference. A failed model does not suppress critical deterministic rules. Only load trusted local joblib files. Version 1 model files must be retrained with the current script.
 
 ## Interface
 

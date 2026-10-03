@@ -28,12 +28,24 @@ import {
 } from "recharts";
 import "./style.css";
 
+type ModelSignal = {
+  sensor: string;
+  value: number;
+  normal_low: number;
+  normal_high: number;
+};
 type Reading = {
   timestamp: number;
   values: Record<string, number | null>;
   quality: Record<string, string>;
   level: string;
-  ml: { status: string; score: number | null };
+  ml: {
+    status: string;
+    score: number | null;
+    source_type?: string;
+    model?: string;
+    signals?: ModelSignal[];
+  };
 };
 type Machine = {
   id: string;
@@ -63,6 +75,10 @@ type Incident = {
     threshold?: number;
     detail?: string;
     source: string;
+    model?: string;
+    score?: number;
+    source_type?: string;
+    signals?: ModelSignal[];
   }[];
   notes: { at: number; text: string }[];
   timeline: { at: number; action: string }[];
@@ -90,7 +106,13 @@ type State = {
     last_success: number | null;
     error: string | null;
   };
-  model: { status: string; machine: string | null };
+  model: {
+    status: string;
+    machine: string | null;
+    version?: string;
+    source_type?: string;
+    threshold?: number;
+  };
   capacity_errors: number;
   limits: {
     queue: number;
@@ -745,18 +767,58 @@ function App() {
                       <SlidersHorizontal size={22} />
                       <h3>Statistical detection</h3>
                       <Badge
-                        value={machine.latest?.ml.status || state.model.status}
+                        value={
+                          machine.latest?.ml.status ||
+                          (state.model.machine === machine.id
+                            ? state.model.status
+                            : "NOT_CALIBRATED")
+                        }
                       />
+                      {(machine.latest?.ml.source_type === "synthetic" ||
+                        (state.model.machine === machine.id &&
+                          state.model.source_type === "synthetic")) && (
+                        <div className="banner bad" style={{ marginTop: 16 }}>
+                          SYNTHETIC MODEL · Demonstration only. Not calibrated
+                          for physical equipment.
+                        </div>
+                      )}
+                      <p className="mono">
+                        Model version:{" "}
+                        {machine.latest?.ml.model ||
+                          (state.model.machine === machine.id
+                            ? state.model.version
+                            : null) ||
+                          "None"}
+                      </p>
                       <p>
-                        Model score:{" "}
+                        Calibrated score margin:{" "}
                         {machine.latest?.ml.score?.toFixed(4) ??
                           "Not available"}
                       </p>
                       <p>
-                        A negative decision score marks unusual behaviour. It is
-                        not a failure probability. Missing inputs suspend model
-                        inference.
+                        A negative score margin crosses the threshold calibrated
+                        on separate normal data. It is not a failure
+                        probability. Missing inputs suspend model inference.
                       </p>
+                      {machine.latest?.ml.signals?.length ? (
+                        <>
+                          <h4>Outside training reference range</h4>
+                          {machine.latest.ml.signals.map((signal) => (
+                            <div className="reason" key={signal.sensor}>
+                              {signal.sensor}: {signal.value.toFixed(2)}
+                              <small>
+                                {signal.normal_low.toFixed(2)}–
+                                {signal.normal_high.toFixed(2)}
+                              </small>
+                            </div>
+                          ))}
+                          <p>
+                            Filtered readings versus the training 1st–99th
+                            percentile range. Descriptive evidence, not causal
+                            feature attribution.
+                          </p>
+                        </>
+                      ) : null}
                       <div className="subtle-note">
                         Thresholds require equipment-specific review. The
                         interface provides monitoring, not automatic machine
@@ -804,6 +866,19 @@ function App() {
                           ? `${r.sensor}: ${r.value} ≥ ${r.threshold} ${sensors[r.sensor!]}`
                           : r.detail}
                         <small>{r.source.toUpperCase()}</small>
+                        {r.source === "model" && (
+                          <p className="mono">
+                            {r.source_type || "unknown source"} · {r.model} ·
+                            margin {r.score?.toFixed(4)}
+                          </p>
+                        )}
+                        {r.signals?.map((signal) => (
+                          <p key={signal.sensor}>
+                            {signal.sensor}: {signal.value.toFixed(2)}; training
+                            reference {signal.normal_low.toFixed(2)}–
+                            {signal.normal_high.toFixed(2)}
+                          </p>
+                        ))}
                       </div>
                     ))}
                     <div className="coverage">

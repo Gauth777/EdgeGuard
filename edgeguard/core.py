@@ -227,33 +227,31 @@ class Store:
                 )
             ]
             ml = {"status": "NOT_CALIBRATED", "score": None}
+            if detector:
+                ml.update(
+                    model=getattr(detector, "version", None),
+                    source_type=getattr(detector, "source_type", None),
+                )
             if detector and len(valid) == 5:
                 # Filtering affects ML only; deterministic limits always see fresh raw values.
-                import statistics
+                from .preprocessing import filter_values
 
-                filtered = {
-                    s: statistics.median(
-                        [valid[s]]
-                        + [
-                            r["values"][s]
-                            for r in previous
-                            if r["quality"].get(s) == "VALID"
-                            and ts - r["timestamp"] <= 10
-                        ]
-                    )
-                    for s in SENSORS
-                }
+                filtered = filter_values(valid, ts, previous)
                 try:
                     ml = detector.evaluate(filtered)
                 except Exception:
                     # A failed model must not suppress deterministic threshold alerts.
-                    ml = {"status": "MODEL_ERROR", "score": None}
+                    ml.update(status="MODEL_ERROR", score=None)
                 if ml["status"] == "ANOMALY":
                     reasons.append(
                         dict(
                             source="model",
                             severity="WARNING",
-                            detail="Unusual sensor combination; not a failure diagnosis",
+                            detail="Unusual sensor pattern; not a failure diagnosis",
+                            model=ml.get("model"),
+                            score=ml.get("score"),
+                            source_type=ml.get("source_type", "unknown"),
+                            signals=ml.get("signals", []),
                         )
                     )
                     if level == "NORMAL":

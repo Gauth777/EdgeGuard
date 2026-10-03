@@ -10,3 +10,11 @@
 Not executed here: Docker build/Compose startup, MQTT broker integration, Windows installation, real hardware ingestion, fleet throughput/resource benchmarks, externally deployed HTTPS, real industrial anomaly accuracy, narrated video recording.
 
 A Starlette TestClient deprecation warning is emitted by the pinned dependency set; tests still pass. The frontend emits a bundle-size advisory (~616 kB minified JS before gzip). Assets are local and do not require an external CDN at runtime.
+
+## ML update — 2026-10-03
+
+- 23 backend tests passed, including shared training/runtime preprocessing, normal-only calibration, model schema validation, model-to-machine binding, synthetic provenance retention and preservation of existing .env settings.
+- Synthetic evaluation rerun through the full ingestion/incident path; see ml-report.md and the complete JSON.
+- TypeScript and production build pass.
+- The trained binary remains local/ignored; scripts.setup_ml generates and enables it explicitly.
+- Live browser verification: below-threshold telemetry generated a model-only incident (no rule trigger); synthetic origin, model version and signal evidence displayed correctly. No JavaScript page errors detected.

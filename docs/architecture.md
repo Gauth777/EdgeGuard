@@ -26,7 +26,7 @@ flowchart TD
 7. Cloud receipt plus materialised state update are atomic. A lost response causes a retry rather than data deletion at the edge. Delivery is at least once, with deduplicated application; it is not an exactly-once network guarantee.
 8. Raw history is finite. Incident evidence survives raw-history eviction because it is copied into the incident record. Interrupted captures are visibly incomplete; restart does not reconstruct periods when the process was stopped.
 9. Routine summaries are low priority. Under queue pressure they can be removed. A queue consisting entirely of important events produces explicit backpressure instead of silent incident loss. This is a finite-storage boundary to discuss during evaluation.
-10. Raw thresholds are never delayed by smoothing. The optional median filter affects ML only. Model artifacts are local/trusted and machine-bound.
+10. Raw thresholds are never delayed by smoothing. The optional median filter affects ML only. Training, calibration, holdout and runtime share the same causal filter. The model threshold is the 0.5th percentile of score_samples on separate normal calibration data. The displayed score is raw score minus threshold. Model artifacts are local/trusted and machine-bound; synthetic origin and model version are retained in incident reasons.
 
 ## Version 0.1 security boundary
 

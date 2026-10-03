@@ -12,16 +12,38 @@ p = argparse.ArgumentParser()
 p.add_argument("--url", default="http://127.0.0.1:8000")
 p.add_argument("--machine", default="M-01")
 p.add_argument(
-    "--scenario", choices=["normal", "incident", "missing", "noise"], default="normal"
+    "--scenario",
+    choices=[
+        "normal",
+        "incident",
+        "missing",
+        "noise",
+        "subthreshold",
+        "combination",
+        "healthy_shift",
+    ],
+    default="normal",
 )
 p.add_argument("--seconds", type=int, default=90)
 p.add_argument("--mqtt-host", default=None)
+p.add_argument("--profile", choices=["legacy", "synthetic"], default="legacy")
+p.add_argument("--seed", type=int, default=7777)
 a = p.parse_args()
 from edgeguard.config import load_env
 
 load_env()
 key = os.environ["EDGEGUARD_API_KEY"]
 rng = random.Random(42)
+synthetic_rows = None
+if a.profile == "synthetic":
+    from edgeguard.synthetic import sequence
+
+    scenario = {"incident": "critical", "noise": "noisy_normal"}.get(
+        a.scenario, a.scenario
+    )
+    synthetic_rows = sequence(a.seed, scenario, length=a.seconds, onset=15, end=55)
+elif a.scenario in ("subthreshold", "combination", "healthy_shift"):
+    raise SystemExit("Use --profile synthetic for this scenario")
 mqtt = None
 if a.mqtt_host:
     import paho.mqtt.client as mqtt_client
@@ -48,6 +70,8 @@ with httpx.Client(headers={"X-API-Key": key}, timeout=10, trust_env=False) as cl
             values["vibration"] = None
         if a.scenario == "noise" and tick % 9 == 0:
             values["vibration"] = -1  # invalid instrument reading, not machine fault
+        if synthetic_rows is not None:
+            values = synthetic_rows[tick]["values"]
         message = dict(
             machine_id=a.machine,
             message_id=str(uuid.uuid4()),

@@ -3,7 +3,7 @@
 | Requirement | Implementation | Validation / limit |
 |---|---|---|
 | Noisy and incomplete streams | Finite-value validation, validity flags, median ML inputs | Missing/invalid/stale tests; hardware noise calibration pending |
-| Detect abnormal behaviour | Immediate critical rules, debounced warnings, optional Isolation Forest | Rules tested; no pre-trained industrial model or real-world accuracy claim |
+| Detect abnormal behaviour | Immediate critical rules, debounced warnings, optional Isolation Forest | Rules and synthetic hybrid model evaluated; no industrial model or real-world accuracy claim |
 | Classify urgency | Normal/warning/critical; unknown data quality separately | Rule tests and interface badges |
 | Reduce cloud traffic | 15-second summaries instead of raw continuous forwarding | Byte counters implemented; no fixed reduction claim |
 | Continue during outage | Edge ingestion/detection independent of cloud requests | Cloud-outage integration test |
@@ -14,7 +14,7 @@
 
 ## User-facing capabilities already built
 
-HTTP registration/ingestion; local and cloud interfaces; sensor history; incident acknowledgement, notes, recovery and close; evidence JSON export; delivery inspection; test publisher; machine-bound model training/loading; optional MQTT adapter and Compose package.
+HTTP registration/ingestion; local and cloud interfaces; sensor history; incident acknowledgement, notes, recovery and close; evidence JSON export; delivery inspection; test publisher; machine-bound model training/loading with synthetic evaluation; optional MQTT adapter and Compose package.
 
 ## Deliberately not claimed complete
 

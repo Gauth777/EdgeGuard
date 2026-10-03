@@ -1,0 +1,719 @@
+{
+  "source_type": "synthetic",
+  "model_version": "2ebc0a6b1b3e937a",
+  "train_seed": 1101,
+  "calibration_seed": 2202,
+  "evaluation_seeds": [
+    3303,
+    4404,
+    5505,
+    6606
+  ],
+  "training_rows": 2400,
+  "calibration_rows": 1200,
+  "threshold": -0.5529199746081035,
+  "normal_tail": 0.005,
+  "sequence_seconds": 150,
+  "summary": [
+    {
+      "scenario": "normal",
+      "policy": "rules",
+      "sequences": 4,
+      "abnormal_episodes": 0,
+      "detected_episodes": 0,
+      "false_incident_starts": 0,
+      "median_detection_delay_seconds": null
+    },
+    {
+      "scenario": "normal",
+      "policy": "hybrid",
+      "sequences": 4,
+      "abnormal_episodes": 0,
+      "detected_episodes": 0,
+      "false_incident_starts": 2,
+      "median_detection_delay_seconds": null
+    },
+    {
+      "scenario": "noisy_normal",
+      "policy": "rules",
+      "sequences": 4,
+      "abnormal_episodes": 0,
+      "detected_episodes": 0,
+      "false_incident_starts": 0,
+      "median_detection_delay_seconds": null
+    },
+    {
+      "scenario": "noisy_normal",
+      "policy": "hybrid",
+      "sequences": 4,
+      "abnormal_episodes": 0,
+      "detected_episodes": 0,
+      "false_incident_starts": 0,
+      "median_detection_delay_seconds": null
+    },
+    {
+      "scenario": "missing",
+      "policy": "rules",
+      "sequences": 4,
+      "abnormal_episodes": 0,
+      "detected_episodes": 0,
+      "false_incident_starts": 0,
+      "median_detection_delay_seconds": null
+    },
+    {
+      "scenario": "missing",
+      "policy": "hybrid",
+      "sequences": 4,
+      "abnormal_episodes": 0,
+      "detected_episodes": 0,
+      "false_incident_starts": 1,
+      "median_detection_delay_seconds": null
+    },
+    {
+      "scenario": "critical",
+      "policy": "rules",
+      "sequences": 4,
+      "abnormal_episodes": 4,
+      "detected_episodes": 4,
+      "false_incident_starts": 0,
+      "median_detection_delay_seconds": 0.0
+    },
+    {
+      "scenario": "critical",
+      "policy": "hybrid",
+      "sequences": 4,
+      "abnormal_episodes": 4,
+      "detected_episodes": 4,
+      "false_incident_starts": 1,
+      "median_detection_delay_seconds": 0.0
+    },
+    {
+      "scenario": "subthreshold",
+      "policy": "rules",
+      "sequences": 4,
+      "abnormal_episodes": 4,
+      "detected_episodes": 0,
+      "false_incident_starts": 0,
+      "median_detection_delay_seconds": null
+    },
+    {
+      "scenario": "subthreshold",
+      "policy": "hybrid",
+      "sequences": 4,
+      "abnormal_episodes": 4,
+      "detected_episodes": 4,
+      "false_incident_starts": 1,
+      "median_detection_delay_seconds": 4.0
+    },
+    {
+      "scenario": "combination",
+      "policy": "rules",
+      "sequences": 4,
+      "abnormal_episodes": 4,
+      "detected_episodes": 0,
+      "false_incident_starts": 0,
+      "median_detection_delay_seconds": null
+    },
+    {
+      "scenario": "combination",
+      "policy": "hybrid",
+      "sequences": 4,
+      "abnormal_episodes": 4,
+      "detected_episodes": 4,
+      "false_incident_starts": 1,
+      "median_detection_delay_seconds": 4.0
+    },
+    {
+      "scenario": "healthy_shift",
+      "policy": "rules",
+      "sequences": 4,
+      "abnormal_episodes": 0,
+      "detected_episodes": 0,
+      "false_incident_starts": 0,
+      "median_detection_delay_seconds": null
+    },
+    {
+      "scenario": "healthy_shift",
+      "policy": "hybrid",
+      "sequences": 4,
+      "abnormal_episodes": 0,
+      "detected_episodes": 0,
+      "false_incident_starts": 5,
+      "median_detection_delay_seconds": null
+    }
+  ],
+  "per_sequence": [
+    {
+      "scenario": "normal",
+      "seed": 3303,
+      "policy": "rules",
+      "abnormal_episode": false,
+      "detected": null,
+      "delay_seconds": null,
+      "false_incident_starts": 0,
+      "incident_starts": 0
+    },
+    {
+      "scenario": "normal",
+      "seed": 3303,
+      "policy": "hybrid",
+      "abnormal_episode": false,
+      "detected": null,
+      "delay_seconds": null,
+      "false_incident_starts": 1,
+      "incident_starts": 1
+    },
+    {
+      "scenario": "normal",
+      "seed": 4404,
+      "policy": "rules",
+      "abnormal_episode": false,
+      "detected": null,
+      "delay_seconds": null,
+      "false_incident_starts": 0,
+      "incident_starts": 0
+    },
+    {
+      "scenario": "normal",
+      "seed": 4404,
+      "policy": "hybrid",
+      "abnormal_episode": false,
+      "detected": null,
+      "delay_seconds": null,
+      "false_incident_starts": 0,
+      "incident_starts": 0
+    },
+    {
+      "scenario": "normal",
+      "seed": 5505,
+      "policy": "rules",
+      "abnormal_episode": false,
+      "detected": null,
+      "delay_seconds": null,
+      "false_incident_starts": 0,
+      "incident_starts": 0
+    },
+    {
+      "scenario": "normal",
+      "seed": 5505,
+      "policy": "hybrid",
+      "abnormal_episode": false,
+      "detected": null,
+      "delay_seconds": null,
+      "false_incident_starts": 1,
+      "incident_starts": 1
+    },
+    {
+      "scenario": "normal",
+      "seed": 6606,
+      "policy": "rules",
+      "abnormal_episode": false,
+      "detected": null,
+      "delay_seconds": null,
+      "false_incident_starts": 0,
+      "incident_starts": 0
+    },
+    {
+      "scenario": "normal",
+      "seed": 6606,
+      "policy": "hybrid",
+      "abnormal_episode": false,
+      "detected": null,
+      "delay_seconds": null,
+      "false_incident_starts": 0,
+      "incident_starts": 0
+    },
+    {
+      "scenario": "noisy_normal",
+      "seed": 3303,
+      "policy": "rules",
+      "abnormal_episode": false,
+      "detected": null,
+      "delay_seconds": null,
+      "false_incident_starts": 0,
+      "incident_starts": 0
+    },
+    {
+      "scenario": "noisy_normal",
+      "seed": 3303,
+      "policy": "hybrid",
+      "abnormal_episode": false,
+      "detected": null,
+      "delay_seconds": null,
+      "false_incident_starts": 0,
+      "incident_starts": 0
+    },
+    {
+      "scenario": "noisy_normal",
+      "seed": 4404,
+      "policy": "rules",
+      "abnormal_episode": false,
+      "detected": null,
+      "delay_seconds": null,
+      "false_incident_starts": 0,
+      "incident_starts": 0
+    },
+    {
+      "scenario": "noisy_normal",
+      "seed": 4404,
+      "policy": "hybrid",
+      "abnormal_episode": false,
+      "detected": null,
+      "delay_seconds": null,
+      "false_incident_starts": 0,
+      "incident_starts": 0
+    },
+    {
+      "scenario": "noisy_normal",
+      "seed": 5505,
+      "policy": "rules",
+      "abnormal_episode": false,
+      "detected": null,
+      "delay_seconds": null,
+      "false_incident_starts": 0,
+      "incident_starts": 0
+    },
+    {
+      "scenario": "noisy_normal",
+      "seed": 5505,
+      "policy": "hybrid",
+      "abnormal_episode": false,
+      "detected": null,
+      "delay_seconds": null,
+      "false_incident_starts": 0,
+      "incident_starts": 0
+    },
+    {
+      "scenario": "noisy_normal",
+      "seed": 6606,
+      "policy": "rules",
+      "abnormal_episode": false,
+      "detected": null,
+      "delay_seconds": null,
+      "false_incident_starts": 0,
+      "incident_starts": 0
+    },
+    {
+      "scenario": "noisy_normal",
+      "seed": 6606,
+      "policy": "hybrid",
+      "abnormal_episode": false,
+      "detected": null,
+      "delay_seconds": null,
+      "false_incident_starts": 0,
+      "incident_starts": 0
+    },
+    {
+      "scenario": "missing",
+      "seed": 3303,
+      "policy": "rules",
+      "abnormal_episode": false,
+      "detected": null,
+      "delay_seconds": null,
+      "false_incident_starts": 0,
+      "incident_starts": 0
+    },
+    {
+      "scenario": "missing",
+      "seed": 3303,
+      "policy": "hybrid",
+      "abnormal_episode": false,
+      "detected": null,
+      "delay_seconds": null,
+      "false_incident_starts": 1,
+      "incident_starts": 1
+    },
+    {
+      "scenario": "missing",
+      "seed": 4404,
+      "policy": "rules",
+      "abnormal_episode": false,
+      "detected": null,
+      "delay_seconds": null,
+      "false_incident_starts": 0,
+      "incident_starts": 0
+    },
+    {
+      "scenario": "missing",
+      "seed": 4404,
+      "policy": "hybrid",
+      "abnormal_episode": false,
+      "detected": null,
+      "delay_seconds": null,
+      "false_incident_starts": 0,
+      "incident_starts": 0
+    },
+    {
+      "scenario": "missing",
+      "seed": 5505,
+      "policy": "rules",
+      "abnormal_episode": false,
+      "detected": null,
+      "delay_seconds": null,
+      "false_incident_starts": 0,
+      "incident_starts": 0
+    },
+    {
+      "scenario": "missing",
+      "seed": 5505,
+      "policy": "hybrid",
+      "abnormal_episode": false,
+      "detected": null,
+      "delay_seconds": null,
+      "false_incident_starts": 0,
+      "incident_starts": 0
+    },
+    {
+      "scenario": "missing",
+      "seed": 6606,
+      "policy": "rules",
+      "abnormal_episode": false,
+      "detected": null,
+      "delay_seconds": null,
+      "false_incident_starts": 0,
+      "incident_starts": 0
+    },
+    {
+      "scenario": "missing",
+      "seed": 6606,
+      "policy": "hybrid",
+      "abnormal_episode": false,
+      "detected": null,
+      "delay_seconds": null,
+      "false_incident_starts": 0,
+      "incident_starts": 0
+    },
+    {
+      "scenario": "critical",
+      "seed": 3303,
+      "policy": "rules",
+      "abnormal_episode": true,
+      "detected": true,
+      "delay_seconds": 0.0,
+      "false_incident_starts": 0,
+      "incident_starts": 1
+    },
+    {
+      "scenario": "critical",
+      "seed": 3303,
+      "policy": "hybrid",
+      "abnormal_episode": true,
+      "detected": true,
+      "delay_seconds": 0.0,
+      "false_incident_starts": 1,
+      "incident_starts": 2
+    },
+    {
+      "scenario": "critical",
+      "seed": 4404,
+      "policy": "rules",
+      "abnormal_episode": true,
+      "detected": true,
+      "delay_seconds": 0.0,
+      "false_incident_starts": 0,
+      "incident_starts": 1
+    },
+    {
+      "scenario": "critical",
+      "seed": 4404,
+      "policy": "hybrid",
+      "abnormal_episode": true,
+      "detected": true,
+      "delay_seconds": 0.0,
+      "false_incident_starts": 0,
+      "incident_starts": 1
+    },
+    {
+      "scenario": "critical",
+      "seed": 5505,
+      "policy": "rules",
+      "abnormal_episode": true,
+      "detected": true,
+      "delay_seconds": 0.0,
+      "false_incident_starts": 0,
+      "incident_starts": 1
+    },
+    {
+      "scenario": "critical",
+      "seed": 5505,
+      "policy": "hybrid",
+      "abnormal_episode": true,
+      "detected": true,
+      "delay_seconds": 0.0,
+      "false_incident_starts": 0,
+      "incident_starts": 1
+    },
+    {
+      "scenario": "critical",
+      "seed": 6606,
+      "policy": "rules",
+      "abnormal_episode": true,
+      "detected": true,
+      "delay_seconds": 0.0,
+      "false_incident_starts": 0,
+      "incident_starts": 1
+    },
+    {
+      "scenario": "critical",
+      "seed": 6606,
+      "policy": "hybrid",
+      "abnormal_episode": true,
+      "detected": true,
+      "delay_seconds": 0.0,
+      "false_incident_starts": 0,
+      "incident_starts": 1
+    },
+    {
+      "scenario": "subthreshold",
+      "seed": 3303,
+      "policy": "rules",
+      "abnormal_episode": true,
+      "detected": false,
+      "delay_seconds": null,
+      "false_incident_starts": 0,
+      "incident_starts": 0
+    },
+    {
+      "scenario": "subthreshold",
+      "seed": 3303,
+      "policy": "hybrid",
+      "abnormal_episode": true,
+      "detected": true,
+      "delay_seconds": 4.0,
+      "false_incident_starts": 1,
+      "incident_starts": 2
+    },
+    {
+      "scenario": "subthreshold",
+      "seed": 4404,
+      "policy": "rules",
+      "abnormal_episode": true,
+      "detected": false,
+      "delay_seconds": null,
+      "false_incident_starts": 0,
+      "incident_starts": 0
+    },
+    {
+      "scenario": "subthreshold",
+      "seed": 4404,
+      "policy": "hybrid",
+      "abnormal_episode": true,
+      "detected": true,
+      "delay_seconds": 4.0,
+      "false_incident_starts": 0,
+      "incident_starts": 1
+    },
+    {
+      "scenario": "subthreshold",
+      "seed": 5505,
+      "policy": "rules",
+      "abnormal_episode": true,
+      "detected": false,
+      "delay_seconds": null,
+      "false_incident_starts": 0,
+      "incident_starts": 0
+    },
+    {
+      "scenario": "subthreshold",
+      "seed": 5505,
+      "policy": "hybrid",
+      "abnormal_episode": true,
+      "detected": true,
+      "delay_seconds": 4.0,
+      "false_incident_starts": 0,
+      "incident_starts": 1
+    },
+    {
+      "scenario": "subthreshold",
+      "seed": 6606,
+      "policy": "rules",
+      "abnormal_episode": true,
+      "detected": false,
+      "delay_seconds": null,
+      "false_incident_starts": 0,
+      "incident_starts": 0
+    },
+    {
+      "scenario": "subthreshold",
+      "seed": 6606,
+      "policy": "hybrid",
+      "abnormal_episode": true,
+      "detected": true,
+      "delay_seconds": 4.0,
+      "false_incident_starts": 0,
+      "incident_starts": 1
+    },
+    {
+      "scenario": "combination",
+      "seed": 3303,
+      "policy": "rules",
+      "abnormal_episode": true,
+      "detected": false,
+      "delay_seconds": null,
+      "false_incident_starts": 0,
+      "incident_starts": 0
+    },
+    {
+      "scenario": "combination",
+      "seed": 3303,
+      "policy": "hybrid",
+      "abnormal_episode": true,
+      "detected": true,
+      "delay_seconds": 4.0,
+      "false_incident_starts": 1,
+      "incident_starts": 2
+    },
+    {
+      "scenario": "combination",
+      "seed": 4404,
+      "policy": "rules",
+      "abnormal_episode": true,
+      "detected": false,
+      "delay_seconds": null,
+      "false_incident_starts": 0,
+      "incident_starts": 0
+    },
+    {
+      "scenario": "combination",
+      "seed": 4404,
+      "policy": "hybrid",
+      "abnormal_episode": true,
+      "detected": true,
+      "delay_seconds": 4.0,
+      "false_incident_starts": 0,
+      "incident_starts": 1
+    },
+    {
+      "scenario": "combination",
+      "seed": 5505,
+      "policy": "rules",
+      "abnormal_episode": true,
+      "detected": false,
+      "delay_seconds": null,
+      "false_incident_starts": 0,
+      "incident_starts": 0
+    },
+    {
+      "scenario": "combination",
+      "seed": 5505,
+      "policy": "hybrid",
+      "abnormal_episode": true,
+      "detected": true,
+      "delay_seconds": 4.0,
+      "false_incident_starts": 0,
+      "incident_starts": 1
+    },
+    {
+      "scenario": "combination",
+      "seed": 6606,
+      "policy": "rules",
+      "abnormal_episode": true,
+      "detected": false,
+      "delay_seconds": null,
+      "false_incident_starts": 0,
+      "incident_starts": 0
+    },
+    {
+      "scenario": "combination",
+      "seed": 6606,
+      "policy": "hybrid",
+      "abnormal_episode": true,
+      "detected": true,
+      "delay_seconds": 4.0,
+      "false_incident_starts": 0,
+      "incident_starts": 1
+    },
+    {
+      "scenario": "healthy_shift",
+      "seed": 3303,
+      "policy": "rules",
+      "abnormal_episode": false,
+      "detected": null,
+      "delay_seconds": null,
+      "false_incident_starts": 0,
+      "incident_starts": 0
+    },
+    {
+      "scenario": "healthy_shift",
+      "seed": 3303,
+      "policy": "hybrid",
+      "abnormal_episode": false,
+      "detected": null,
+      "delay_seconds": null,
+      "false_incident_starts": 2,
+      "incident_starts": 2
+    },
+    {
+      "scenario": "healthy_shift",
+      "seed": 4404,
+      "policy": "rules",
+      "abnormal_episode": false,
+      "detected": null,
+      "delay_seconds": null,
+      "false_incident_starts": 0,
+      "incident_starts": 0
+    },
+    {
+      "scenario": "healthy_shift",
+      "seed": 4404,
+      "policy": "hybrid",
+      "abnormal_episode": false,
+      "detected": null,
+      "delay_seconds": null,
+      "false_incident_starts": 1,
+      "incident_starts": 1
+    },
+    {
+      "scenario": "healthy_shift",
+      "seed": 5505,
+      "policy": "rules",
+      "abnormal_episode": false,
+      "detected": null,
+      "delay_seconds": null,
+      "false_incident_starts": 0,
+      "incident_starts": 0
+    },
+    {
+      "scenario": "healthy_shift",
+      "seed": 5505,
+      "policy": "hybrid",
+      "abnormal_episode": false,
+      "detected": null,
+      "delay_seconds": null,
+      "false_incident_starts": 1,
+      "incident_starts": 1
+    },
+    {
+      "scenario": "healthy_shift",
+      "seed": 6606,
+      "policy": "rules",
+      "abnormal_episode": false,
+      "detected": null,
+      "delay_seconds": null,
+      "false_incident_starts": 0,
+      "incident_starts": 0
+    },
+    {
+      "scenario": "healthy_shift",
+      "seed": 6606,
+      "policy": "hybrid",
+      "abnormal_episode": false,
+      "detected": null,
+      "delay_seconds": null,
+      "false_incident_starts": 1,
+      "incident_starts": 1
+    }
+  ],
+  "hybrid_ingestion_ms": {
+    "median": 3.307457500000055,
+    "p95": 5.547315999990587
+  },
+  "artifact_bytes": 1038944,
+  "limitations": [
+    "Synthetic scenarios, not industrial accuracy.",
+    "Same generator family in training and evaluation; held-out seeds do not eliminate simulation bias.",
+    "Healthy-shift scenario tests a new valid regime and may cause false alarms.",
+    "Only four runs per scenario; no fleet throughput claim.",
+    "Latency includes SQLite and inference on the current host; not a target-device benchmark."
+  ]
+}

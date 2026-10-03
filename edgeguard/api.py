@@ -123,7 +123,7 @@ def create_app(role=None, path=None, key=None, background=True):
     detector = None
     model_path = os.getenv("EDGEGUARD_MODEL")
     model_machine = os.getenv("EDGEGUARD_MODEL_MACHINE")
-    if model_path:
+    if model_path and role == "edge":
         if not model_machine:
             raise RuntimeError(
                 "Set EDGEGUARD_MODEL_MACHINE to bind the calibrated model to one machine"
@@ -195,7 +195,10 @@ def create_app(role=None, path=None, key=None, background=True):
             ),
             model=dict(
                 status="AVAILABLE" if detector else "NOT_CALIBRATED",
-                machine=model_machine,
+                machine=model_machine if role == "edge" else None,
+                version=detector.version if detector else None,
+                source_type=detector.source_type if detector else None,
+                threshold=detector.threshold if detector else None,
             ),
             fault_controls=os.getenv("EDGEGUARD_ENABLE_FAULTS") == "1",
         )
